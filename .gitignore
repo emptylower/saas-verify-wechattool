@@ -1,0 +1,9 @@
+node_modules/
+data/
+.omx/
+.DS_Store
+*.log
+
+config/integrations.local.json
+config/integrations.production.json
+config/*.secret.json

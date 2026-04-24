@@ -1,0 +1,13 @@
+{
+  "name": "wechat-binding-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zero-dependency reference implementation for a WeChat Official Account binding verification service.",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test",
+    "lint": "node scripts/check.mjs",
+    "build": "node scripts/build-check.mjs"
+  }
+}

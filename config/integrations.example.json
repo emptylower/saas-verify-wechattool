@@ -1,0 +1,11 @@
+{
+  "tenants": {
+    "demo-tenant": {
+      "clientId": "demo-client",
+      "clientSecret": "demo-secret",
+      "wechatToken": "demo-wechat-token",
+      "wechatAppId": "wx-your-official-account-appid",
+      "wechatAppSecret": "your-official-account-appsecret"
+    }
+  }
+}

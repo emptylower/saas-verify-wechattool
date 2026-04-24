@@ -1,0 +1,291 @@
+openapi: 3.1.0
+info:
+  title: WeChat Binding Plugin
+  version: 0.1.0
+  description: Standalone binding verification service for WeChat Official Account based onboarding gates.
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+  /v1/tenants/{tenantId}/pending-bind-intents:
+    post:
+      summary: Create a pending bind intent
+      security:
+        - ClientIdHeader: []
+          ClientSecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platformAccountId]
+              properties:
+                platformAccountId:
+                  type: string
+                ttlSeconds:
+                  type: integer
+                correlationId:
+                  type: string
+      responses:
+        '201':
+          description: Pending bind intent created
+  /v1/tenants/{tenantId}/bindings/{platformAccountId}:
+    get:
+      summary: Query binding status for a platform account
+      security:
+        - ClientIdHeader: []
+          ClientSecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PlatformAccountId'
+      responses:
+        '200':
+          description: Binding lookup result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BindingStatus'
+  /v1/tenants/{tenantId}/audit/bindings/{platformAccountId}:
+    get:
+      summary: Read binding audit record
+      security:
+        - ClientIdHeader: []
+          ClientSecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PlatformAccountId'
+      responses:
+        '200':
+          description: Binding audit record
+  /v1/tenants/{tenantId}/audit/attempts:
+    get:
+      summary: List recent binding attempts
+      security:
+        - ClientIdHeader: []
+          ClientSecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: platformAccountId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Attempt records
+  /v1/tenants/{tenantId}/wechat/users/{openId}:
+    get:
+      summary: Query WeChat Official Account user subscribe status
+      security:
+        - ClientIdHeader: []
+          ClientSecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: openId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Official Account user profile subset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeChatUserInfo'
+        '400':
+          description: WeChat official account credentials are not configured
+  /v1/tenants/{tenantId}/wechat/followers:
+    get:
+      summary: List WeChat Official Account follower OpenIDs
+      security:
+        - ClientIdHeader: []
+          ClientSecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: nextOpenId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: One page of follower OpenIDs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeChatFollowers'
+        '400':
+          description: WeChat official account credentials are not configured
+  /wechat/{tenantId}/webhook:
+    get:
+      summary: Verify WeChat webhook configuration
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: signature
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: timestamp
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: echostr
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Echo response for WeChat verification
+    post:
+      summary: Receive WeChat follow or bind messages
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: signature
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: timestamp
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: XML reply to WeChat
+components:
+  securitySchemes:
+    ClientIdHeader:
+      type: apiKey
+      in: header
+      name: x-client-id
+      description: Tenant-scoped host client identifier for server-to-server plugin calls.
+    ClientSecretHeader:
+      type: apiKey
+      in: header
+      name: x-client-secret
+      description: Tenant-scoped host secret for server-to-server plugin calls.
+  parameters:
+    TenantId:
+      name: tenantId
+      in: path
+      required: true
+      schema:
+        type: string
+    PlatformAccountId:
+      name: platformAccountId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    BindingStatus:
+      type: object
+      required:
+        - tenant_id
+        - platform_account_id
+        - binding_status
+        - is_bound
+        - bound_at
+        - wechat_binding_ref
+        - wechat_official_account_appid
+        - wechat_subscribe_status
+        - reason_code
+      properties:
+        tenant_id:
+          type: string
+        platform_account_id:
+          type: string
+        binding_status:
+          type: string
+          enum: [bound, unbound]
+        is_bound:
+          type: boolean
+        bound_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        wechat_binding_ref:
+          type:
+            - string
+            - 'null'
+        wechat_official_account_appid:
+          type:
+            - string
+            - 'null'
+        wechat_subscribe_status:
+          type:
+            - string
+            - 'null'
+          enum: [subscribed, unsubscribed, unchecked, null]
+        reason_code:
+          type:
+            - string
+            - 'null'
+    WeChatUserInfo:
+      type: object
+      required:
+        - open_id
+        - union_id
+        - subscribe
+        - subscribe_time
+      properties:
+        open_id:
+          type: string
+        union_id:
+          type:
+            - string
+            - 'null'
+        subscribe:
+          type: boolean
+        subscribe_time:
+          type:
+            - integer
+            - 'null'
+    WeChatFollowers:
+      type: object
+      required:
+        - total
+        - count
+        - open_ids
+        - next_open_id
+      properties:
+        total:
+          type: integer
+        count:
+          type: integer
+        open_ids:
+          type: array
+          items:
+            type: string
+        next_open_id:
+          type: string
