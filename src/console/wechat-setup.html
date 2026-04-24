@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>微信公众号接入教程</title>
+    <link rel="stylesheet" href="/console/styles.css">
+  </head>
+  <body class="doc-page">
+    <header class="doc-hero">
+      <a class="back-link" href="/console">← 返回控制台</a>
+      <p class="eyebrow">新版微信开发者平台流程</p>
+      <h1>微信公众号接入教程</h1>
+      <p>
+        从微信开发者平台拿到 AppID、AppSecret、API 白名单和消息推送配置，
+        再回到本项目控制台保存租户配置。关键信息示例均已打码。
+      </p>
+    </header>
+
+    <main class="doc-layout">
+      <nav class="doc-toc panel">
+        <strong>配置顺序</strong>
+        <a href="#wechat-platform">1. 进入公众号开发者后台</a>
+        <a href="#wechat-fields">2. 获取微信侧配置</a>
+        <a href="#message-push">3. 启用消息推送</a>
+        <a href="#plugin-console">4. 回填本项目控制台</a>
+        <a href="#verify">5. 端到端验证</a>
+      </nav>
+
+      <article class="doc-content">
+        <section id="wechat-platform" class="panel doc-section">
+          <h2>1. 进入公众号开发者后台</h2>
+          <p>
+            现在从 <a href="https://developers.weixin.qq.com/" target="_blank" rel="noreferrer">微信开发者平台</a>
+            登录，不再按旧的公众号后台入口找开发配置。
+          </p>
+          <ol>
+            <li>打开微信开发者平台并登录。</li>
+            <li>进入 <strong>我的业务与服务</strong>。</li>
+            <li>在 <strong>我的业务</strong> 中选择 <strong>公众号</strong>。</li>
+            <li>点击要接入的公众号，进入公众号开发者后台。</li>
+          </ol>
+          <figure class="mock-screen">
+            <figcaption>图 1：从「我的业务」进入「公众号」</figcaption>
+            <div class="mock-browser">
+              <div class="mock-topbar">微信开发者平台 / 我的业务与服务</div>
+              <div class="mock-card large">我的业务</div>
+              <div class="mock-service-row">
+                <span>小程序 0</span>
+                <span class="highlight-box">公众号 1</span>
+                <span>服务号 0</span>
+              </div>
+            </div>
+          </figure>
+        </section>
+
+        <section id="wechat-fields" class="panel doc-section">
+          <h2>2. 获取微信侧配置</h2>
+          <p>进入公众号详情页后，重点看三个区域：基础信息、开发密钥、域名与消息推送配置。</p>
+          <div class="checklist">
+            <div>
+              <strong>复制 AppID</strong>
+              <p>填入本项目控制台的 <code>微信 AppID</code>。</p>
+            </div>
+            <div>
+              <strong>启用 AppSecret</strong>
+              <p>如果页面显示「重置/冻结」，说明已可用；把 AppSecret 保存到本项目控制台。</p>
+            </div>
+            <div>
+              <strong>启用 API IP 白名单</strong>
+              <p>把运行本服务的出口 IP 加入白名单，否则换取 <code>access_token</code> 会失败。</p>
+            </div>
+          </div>
+          <figure class="mock-screen">
+            <figcaption>图 2：公众号开发者后台关键信息</figcaption>
+            <div class="mock-browser">
+              <div class="mock-topbar">首页 / 公众号 / CC 使用技巧</div>
+              <div class="mock-field highlight-box">AppID　wx8bd26******20c6</div>
+              <div class="mock-field">原始ID　gh_5d4b******ea2a</div>
+              <div class="mock-field highlight-box">AppSecret　************　重置 / 冻结</div>
+              <div class="mock-field highlight-box">API IP 白名单　106.73.***.162　编辑</div>
+            </div>
+          </figure>
+        </section>
+
+        <section id="message-push" class="panel doc-section">
+          <h2>3. 启用消息推送</h2>
+          <p>
+            这是绑定能不能成功的核心。用户给公众号发消息后，微信只会把消息推送到这里配置的 URL。
+          </p>
+          <ol>
+            <li>在 <strong>域名与消息推送配置</strong> 中找到 <strong>消息推送</strong>。</li>
+            <li>点击 <strong>启用</strong> 或 <strong>编辑</strong>。</li>
+            <li>URL 填本服务公网地址：<code>https://你的域名/wechat/{tenantId}/webhook</code>。</li>
+            <li>Token 建议点微信侧 <strong>随机生成</strong>，然后复制到本项目控制台。</li>
+            <li>消息加密方式选择 <strong>明文模式</strong>。</li>
+            <li>数据格式选择 <strong>XML</strong>。</li>
+            <li>保存后回到列表，确认消息推送处于 <strong>启用</strong> 状态。</li>
+          </ol>
+          <div class="warning-box">
+            <strong>Token 注意事项</strong>
+            <p>
+              Token 必须和本项目控制台里的 <code>微信 Token</code> 完全一致。不要手写带短横线的值；
+              如果微信提示「请输入正确的 Token」，直接使用微信页面的随机生成值最稳。
+            </p>
+          </div>
+          <figure class="mock-screen">
+            <figcaption>图 3：消息推送配置项</figcaption>
+            <div class="mock-browser">
+              <div class="mock-modal-title">配置消息推送</div>
+              <div class="mock-field highlight-box">URL　https://***.trycloudflare.com/wechat/acme-wechat/webhook</div>
+              <div class="mock-field highlight-box">Token　wxverify******2026</div>
+              <div class="mock-field">EncodingAESKey　随机生成，明文模式暂不使用</div>
+              <div class="mock-field highlight-box">消息加密　● 明文模式　○ 安全模式　○ 兼容模式</div>
+              <div class="mock-field highlight-box">数据格式　● XML</div>
+              <div class="mock-submit">确定并启用</div>
+            </div>
+          </figure>
+        </section>
+
+        <section id="plugin-console" class="panel doc-section">
+          <h2>4. 回填本项目控制台</h2>
+          <p>微信侧配置完成后，回到本项目 <a href="/console">Web 控制台</a> 保存租户配置。</p>
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>控制台字段</th>
+                <th>填写来源</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Tenant ID</td>
+                <td>你自己定义</td>
+                <td>会出现在 webhook URL 中，例如 <code>acme-wechat</code>。</td>
+              </tr>
+              <tr>
+                <td>Host Client ID / Secret</td>
+                <td>你自己定义</td>
+                <td>SaaS 后端调用本服务 API 时使用，不能暴露给浏览器。</td>
+              </tr>
+              <tr>
+                <td>微信 Token</td>
+                <td>消息推送配置</td>
+                <td>必须和微信开发者平台消息推送 Token 一致。</td>
+              </tr>
+              <tr>
+                <td>微信 AppID / AppSecret</td>
+                <td>公众号详情页</td>
+                <td>用于换取 access_token；如果公众号没有 user/info 权限，绑定仍可基于消息 OpenID 完成。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="verify" class="panel doc-section">
+          <h2>5. 端到端验证</h2>
+          <ol>
+            <li>SaaS 后端调用 <code>POST /v1/tenants/{tenantId}/pending-bind-intents</code> 创建待绑定会话。</li>
+            <li>用户关注公众号，并向公众号发送自己的平台账号。</li>
+            <li>本服务收到微信回调，读取 <code>FromUserName</code> 作为该公众号下的唯一 OpenID。</li>
+            <li>如果该 OpenID 未绑定其他平台账号，并且平台账号有有效会话，则写入绑定。</li>
+            <li>SaaS 后端查询 <code>GET /v1/tenants/{tenantId}/bindings/{platformAccountId}</code>，返回 <code>is_bound: true</code> 后再发放免费额度。</li>
+          </ol>
+          <div class="success-box">
+            <strong>验收口径</strong>
+            <p>同一 OpenID 第一次绑定成功；同一 OpenID 再绑定第二个账号时，返回 <code>wechat_already_bound</code>。</p>
+          </div>
+        </section>
+      </article>
+    </main>
+  </body>
+</html>

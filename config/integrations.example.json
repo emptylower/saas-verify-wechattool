@@ -3,7 +3,7 @@
     "demo-tenant": {
       "clientId": "demo-client",
       "clientSecret": "demo-secret",
-      "wechatToken": "demo-wechat-token",
+      "wechatToken": "demowechattoken",
       "wechatAppId": "wx-your-official-account-appid",
       "wechatAppSecret": "your-official-account-appsecret"
     }

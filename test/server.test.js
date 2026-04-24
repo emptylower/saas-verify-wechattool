@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 
 import { createApp } from '../src/server.js';
+import { HttpError } from '../src/lib/errors.js';
 
 const originalFetch = globalThis.fetch;
 
@@ -279,11 +280,22 @@ test('serves embedded console assets with admin workflow entrypoint', async () =
     const consoleResponse = await fetch(`${app.baseUrl}/console`);
     const consoleBody = await consoleResponse.text();
     const scriptResponse = await fetch(`${app.baseUrl}/console/app.js`);
+    const guideResponse = await fetch(`${app.baseUrl}/console/wechat-setup.html`);
+    const guideBody = await guideResponse.text();
+    const flowImageResponse = await fetch(`${app.baseUrl}/console/wechat-onboarding-flow.png`);
 
     assert.equal(consoleResponse.status, 200);
     assert.match(consoleBody, /SaaS Verify WeChat Console/);
+    assert.match(consoleBody, /wechat-setup\.html/);
+    assert.match(consoleBody, /wechat-onboarding-flow\.png/);
     assert.equal(scriptResponse.status, 200);
     assert.match(await scriptResponse.text(), /v1\/admin\/tenants/);
+    assert.equal(guideResponse.status, 200);
+    assert.match(guideBody, /新版微信开发者平台流程/);
+    assert.match(guideBody, /消息推送/);
+    assert.doesNotMatch(guideBody, /u-sync-hero\.svg/);
+    assert.equal(flowImageResponse.status, 200);
+    assert.equal(flowImageResponse.headers['content-type'], 'image/png');
   } finally {
     await app.close();
   }
@@ -645,6 +657,53 @@ test('rejects binding when official WeChat lookup says the user is not subscribe
 
     assert.equal(statusBody.binding_status, 'unbound');
     assert.equal(statusBody.is_bound, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test('continues binding when optional WeChat user info API is unauthorized', async () => {
+  const officialAccountClient = {
+    async getUserInfo() {
+      throw new HttpError(502, 'wechat_user_info_failed', 'Failed to get WeChat user info.', {
+        errcode: 48001,
+        errmsg: 'api unauthorized'
+      });
+    }
+  };
+  const app = await startServer({
+    tenantOverrides: {
+      'tenant-a': {
+        wechatAppId: 'wx-tenant-a',
+        wechatAppSecret: 'app-secret-a'
+      }
+    },
+    officialAccountClient
+  });
+
+  try {
+    await createPendingIntent(app, 'alice');
+    const webhookResponse = await sendWebhookMessage(app, {
+      fromUserName: 'wechat-user-a',
+      content: 'alice',
+      messageId: '7501',
+      nonce: 'nonce-7501'
+    });
+    const webhookBody = await webhookResponse.text();
+
+    assert.equal(webhookResponse.status, 200);
+    assert.match(webhookBody, /Binding completed successfully/);
+
+    const statusResponse = await fetch(`${app.baseUrl}/v1/tenants/tenant-a/bindings/alice`, {
+      headers: {
+        'x-client-id': tenantMetadata('tenant-a').clientId,
+        'x-client-secret': tenantMetadata('tenant-a').clientSecret
+      }
+    });
+    const statusBody = await statusResponse.json();
+
+    assert.equal(statusBody.binding_status, 'bound');
+    assert.equal(statusBody.wechat_subscribe_status, 'unchecked');
   } finally {
     await app.close();
   }

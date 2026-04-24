@@ -141,7 +141,7 @@ curl -sS 'http://127.0.0.1:3000/v1/tenants/demo-tenant/audit/attempts?platformAc
 ```bash
 TS=1713945600
 NONCE=nonce-1
-TOKEN=demo-wechat-token
+TOKEN=demowechattoken
 SIG=$(node -e "const crypto=require('node:crypto'); const token=process.argv[1]; const ts=process.argv[2]; const nonce=process.argv[3]; process.stdout.write(crypto.createHash('sha1').update([token,ts,nonce].sort().join('')).digest('hex'))" "$TOKEN" "$TS" "$NONCE")
 
 XML='<xml><ToUserName><![CDATA[official-account]]></ToUserName><FromUserName><![CDATA[wechat-openid-a]]></FromUserName><CreateTime>1713945600</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[alice]]></Content><MsgId>1001</MsgId></xml>'
@@ -177,7 +177,7 @@ curl -sS -X PUT http://127.0.0.1:3000/v1/admin/tenants/demo-tenant \
   -d '{
     "clientId": "demo-client",
     "clientSecret": "demo-secret",
-    "wechatToken": "demo-wechat-token",
+    "wechatToken": "demowechattoken",
     "wechatAppId": "wx-your-official-account-appid",
     "wechatAppSecret": "your-official-account-appsecret"
   }'

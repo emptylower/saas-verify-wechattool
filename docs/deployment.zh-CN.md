@@ -42,7 +42,7 @@ http://127.0.0.1:3000/console
 控制台能力：
 
 - 新增或更新租户配置，保存到 `WVB_CONFIG_PATH` 指向的 JSON 文件。
-- 展示微信公众号服务器 URL 和接入教程。
+- 展示当前租户 Webhook URL，并引导站长打开 `/console/wechat-setup.html` 图文教程。
 - 查询用户验证状态。
 - 查看最近验证尝试。
 

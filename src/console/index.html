@@ -65,14 +65,19 @@
 
       <section class="panel guide-panel">
         <h2>接入教程</h2>
-        <ol>
-          <li>登录微信公众号后台，进入开发者配置。</li>
-          <li>复制 `AppID` 和 `AppSecret` 到左侧表单。</li>
-          <li>生成一串随机 `Token`，同时填入公众号后台和左侧表单。</li>
-          <li>公众号服务器 URL 填写：<code id="webhookUrl">/wechat/{tenantId}/webhook</code></li>
-          <li>V1 选择明文模式，`EncodingAESKey` 先保存备用。</li>
-          <li>SaaS 后端先创建待绑定会话，再引导用户关注公众号并发送平台账号。</li>
-        </ol>
+        <p>
+          新版公众号配置已迁移到微信开发者平台。先按独立教程拿到 AppID、AppSecret、
+          API IP 白名单和消息推送配置，再回到这里保存。
+        </p>
+        <a class="doc-link-card" href="/console/wechat-setup.html" target="_blank" rel="noreferrer">
+          <img src="/console/wechat-onboarding-flow.png" alt="微信公众号接入流程图">
+          打开图文接入教程
+          <span>包含新版入口、红框示意、Token 规则和本项目回填流程。</span>
+        </a>
+        <div class="webhook-preview">
+          <strong>当前租户 Webhook URL</strong>
+          <code id="webhookUrl">/wechat/{tenantId}/webhook</code>
+        </div>
         <div class="copy-row">
           <input id="publicBaseUrl" placeholder="https://your-domain.com" value="">
           <button id="copyWebhookButton" type="button">复制完整 Webhook URL</button>

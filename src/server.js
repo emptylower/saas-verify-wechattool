@@ -29,12 +29,20 @@ function matchRoute(method, pathname) {
     return { name: 'consoleIndex', params: {} };
   }
 
+  if (method === 'GET' && (pathname === '/console/wechat-setup' || pathname === '/console/wechat-setup.html')) {
+    return { name: 'consoleWeChatSetup', params: {} };
+  }
+
   if (method === 'GET' && pathname === '/console/styles.css') {
     return { name: 'consoleStyles', params: {} };
   }
 
   if (method === 'GET' && pathname === '/console/app.js') {
     return { name: 'consoleScript', params: {} };
+  }
+
+  if (method === 'GET' && pathname === '/console/wechat-onboarding-flow.png') {
+    return { name: 'consoleFlowImage', params: {} };
   }
 
   if (method === 'GET' && pathname === '/health') {
@@ -142,6 +150,14 @@ function getMessageReply(result) {
   }
 }
 
+function isOptionalWeChatUserInfoFailure(error) {
+  return (
+    error instanceof HttpError &&
+    error.code === 'wechat_user_info_failed' &&
+    [48001, 40003].includes(error.details?.errcode)
+  );
+}
+
 export async function createApp({
   configPath = process.env.WVB_CONFIG_PATH ?? './config/integrations.example.json',
   dataPath = process.env.WVB_DATA_PATH ?? './data/store.json',
@@ -170,6 +186,12 @@ export async function createApp({
         return;
       }
 
+      if (match.name === 'consoleWeChatSetup') {
+        const html = await readFile(path.join(consoleDirectory, 'wechat-setup.html'), 'utf8');
+        sendHtml(response, 200, html);
+        return;
+      }
+
       if (match.name === 'consoleStyles') {
         const css = await readFile(path.join(consoleDirectory, 'styles.css'), 'utf8');
         sendCss(response, 200, css);
@@ -179,6 +201,13 @@ export async function createApp({
       if (match.name === 'consoleScript') {
         const script = await readFile(path.join(consoleDirectory, 'app.js'), 'utf8');
         sendJavaScript(response, 200, script);
+        return;
+      }
+
+      if (match.name === 'consoleFlowImage') {
+        const png = await readFile(path.join(consoleDirectory, 'wechat-onboarding-flow.png'));
+        response.writeHead(200, { 'content-type': 'image/png' });
+        response.end(png);
         return;
       }
 
@@ -313,7 +342,15 @@ export async function createApp({
           return;
         }
 
-        const wechatProfile = await officialAccountClient.getUserInfo(tenantConfig, message.fromUserName);
+        let wechatProfile = null;
+
+        try {
+          wechatProfile = await officialAccountClient.getUserInfo(tenantConfig, message.fromUserName);
+        } catch (error) {
+          if (!isOptionalWeChatUserInfoFailure(error)) {
+            throw error;
+          }
+        }
 
         if (wechatProfile && !wechatProfile.subscribe) {
           const reply = buildWeChatTextResponse({

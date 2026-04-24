@@ -1,117 +1,191 @@
 # 微信公众号接入指南
 
-本文面向 SaaS 站长，说明如何把自己的微信公众号接入本服务。
+本文面向 SaaS 站长，说明如何在新版微信开发者平台完成公众号接入，并把配置回填到本项目控制台。
 
-## 你需要准备什么
+> Web 版图文教程：启动服务后打开 `/console/wechat-setup.html`。
 
-- 一个可登录的微信公众号后台。
-- 一个公网 HTTPS 域名，能访问本服务。
-- 本服务中的一个 `tenantId`，例如 `demo-tenant`。
-- 本服务配置文件中的 `clientId`、`clientSecret`、`wechatToken`、`wechatAppId`、`wechatAppSecret`。
+## 0. 先明确两个配置端
 
-## 从公众号后台取得配置
+接入要配置两边：
 
-进入微信公众号后台后，打开开发相关页面，找到开发者配置。
+1. **微信开发者平台**：拿到 `AppID`、`AppSecret`，配置 API IP 白名单，启用消息推送。
+2. **本项目控制台**：保存 `Tenant ID`、Host API 凭据、微信 `Token`、`AppID`、`AppSecret`。
 
-需要记录：
+消息推送 URL 的格式固定是：
 
-- `AppID`：填入本服务配置的 `wechatAppId`。
-- `AppSecret`：填入本服务配置的 `wechatAppSecret`。
-- 服务器配置 `Token`：可以由你自己生成一串随机字符串，填入本服务配置的 `wechatToken`。
-- `EncodingAESKey`：V1 使用明文模式，先不需要写入服务配置，但建议保存，后续升级加密模式会用到。
-
-如果公众号后台要求配置 IP 白名单，把运行本服务的服务器出口 IP 加入白名单。否则获取 `access_token`、查询用户信息、拉关注者列表可能失败。
-
-## 配置本服务
-
-复制示例配置：
-
-```bash
-cp config/integrations.example.json config/integrations.local.json
+```text
+https://your-domain.com/wechat/{tenantId}/webhook
 ```
 
-编辑 `config/integrations.local.json`：
+其中 `{tenantId}` 必须和本项目控制台里的 `Tenant ID` 完全一致。
+
+## 1. 进入新版公众号开发者后台
+
+旧的公众号开发配置入口已经迁移。现在从这里登录：
+
+```text
+https://developers.weixin.qq.com/
+```
+
+登录后：
+
+1. 进入 **我的业务与服务**。
+2. 在 **我的业务** 里选择 **公众号**。
+3. 点击要接入的公众号，进入公众号开发者后台。
+
+## 2. 获取 AppID 和 AppSecret
+
+进入公众号详情页后，在基础信息与开发密钥区域：
+
+- 复制 `AppID`，填入本项目控制台的 `微信 AppID`。
+- 启用或重置 `AppSecret`，填入本项目控制台的 `微信 AppSecret`。
+- 不要把 `AppSecret` 写入公开文档、截图、前端代码或日志。
+
+示例打码：
+
+```text
+AppID: wx8bd26******20c6
+AppSecret: ************
+```
+
+## 3. 启用 API IP 白名单
+
+在开发密钥区域找到 **API IP 白名单**，把运行本服务的服务器出口 IP 加入白名单。
+
+如果不加，换取微信 `access_token` 会失败，典型错误是：
 
 ```json
 {
-  "tenants": {
-    "your-tenant": {
-      "clientId": "your-host-client-id",
-      "clientSecret": "your-host-client-secret",
-      "wechatToken": "same-token-as-wechat-console",
-      "wechatAppId": "wx1234567890abcdef",
-      "wechatAppSecret": "your-official-account-appsecret"
-    }
-  }
+  "errcode": 40164,
+  "errmsg": "invalid ip ... not in whitelist"
 }
 ```
 
-启动：
+本项目 V1 在公众号没有 `user/info` 权限时也能完成绑定，因为微信消息回调里的 `FromUserName` 已经是该公众号下的唯一 `OpenID`。但 `access_token` 仍建议配置通，用于后续扩展关注状态校验、关注者列表、运维诊断。
+
+## 4. 启用消息推送
+
+在 **域名与消息推送配置** 区域找到 **消息推送**，点击 **启用** 或 **编辑**。
+
+填写：
+
+```text
+URL:
+https://your-domain.com/wechat/{tenantId}/webhook
+
+Token:
+建议使用微信页面随机生成的 Token
+
+消息加密方式:
+明文模式
+
+数据格式:
+XML
+```
+
+注意：
+
+- `Token` 必须和本项目控制台的 `微信 Token` 完全一致。
+- 不要手写带短横线的 token；如果微信提示「请输入正确的 Token」，直接使用页面随机生成值。
+- `EncodingAESKey` 在明文模式下不会被本项目 V1 使用；如果页面强制要求，可以随机生成并保存备用。
+- 保存后必须确认消息推送处于 **启用** 状态。保存成功不等于已启用。
+
+## 5. 回填本项目控制台
+
+打开：
+
+```text
+http://127.0.0.1:3000/console
+```
+
+填写：
+
+| 控制台字段 | 来源 | 说明 |
+| --- | --- | --- |
+| `Tenant ID` | 自定义 | 例如 `acme-wechat`，会出现在 webhook URL 中。 |
+| `Host Client ID` | 自定义 | SaaS 后端调用本服务 API 使用。 |
+| `Host Client Secret` | 自定义 | 只能保存在 SaaS 后端，不要暴露给浏览器。 |
+| `微信 Token` | 微信消息推送配置 | 必须和微信开发者平台里填的一致。 |
+| `微信 AppID` | 公众号详情页 | 复制 AppID。 |
+| `微信 AppSecret` | 开发密钥区域 | 复制或重置 AppSecret。 |
+
+保存后，控制台会长期写入 `WVB_CONFIG_PATH` 指向的 JSON 文件。
+
+## 6. SaaS 后端验证流程
+
+用户要领取免费额度时，SaaS 后端先创建待绑定会话：
 
 ```bash
-WVB_CONFIG_PATH=./config/integrations.local.json npm start
+curl -sS -X POST http://127.0.0.1:3000/v1/tenants/acme-wechat/pending-bind-intents \
+  -H 'content-type: application/json' \
+  -H 'x-client-id: your-host-client-id' \
+  -H 'x-client-secret: your-host-client-secret' \
+  -d '{
+    "platformAccountId": "user_123",
+    "ttlSeconds": 600,
+    "correlationId": "onboarding-free-quota"
+  }'
 ```
 
-## 配置公众号服务器 URL
-
-在微信公众号后台的服务器配置中填写：
+然后引导用户：
 
 ```text
-https://your-domain.com/wechat/your-tenant/webhook
+请关注我们的公众号，并向公众号发送你的平台账号：user_123
 ```
 
-其他配置：
+绑定成功后，SaaS 后端查询：
 
-- `Token`：必须和 `wechatToken` 完全一致。
-- 消息加解密方式：V1 选择明文模式。
-- `EncodingAESKey`：可随机生成并保存，但 V1 明文模式不会使用。
-
-提交配置时，微信会向本服务发送一次 `GET /wechat/:tenantId/webhook` 验证请求。本服务会校验签名并返回 `echostr`。
-
-## 用户绑定流程
-
-1. 用户登录 SaaS 网站。
-2. SaaS 后端调用本服务创建 pending bind intent。
-3. 网站页面引导用户关注公众号。
-4. 用户向公众号发送自己的平台账号，例如邮箱、用户名、用户 ID。
-5. 微信把消息 POST 到本服务 webhook。
-6. 本服务读取 `FromUserName` 作为 `OpenID`，读取 `Content` 作为平台账号。
-7. 本服务查询微信用户信息，确认该 `OpenID` 仍关注公众号。
-8. 本服务检查是否存在未过期的 pending bind intent。
-9. 绑定成功后，SaaS 后端查询绑定状态并发放免费额度。
-
-## 用户侧推荐文案
-
-在 SaaS 网站的新手任务中可以这样写：
-
-```text
-第一步：完成微信验证
-请关注我们的公众号，并向公众号发送你的平台账号：{platformAccountId}
-系统验证成功后，会自动解锁免费额度。
+```bash
+curl -sS http://127.0.0.1:3000/v1/tenants/acme-wechat/bindings/user_123 \
+  -H 'x-client-id: your-host-client-id' \
+  -H 'x-client-secret: your-host-client-secret'
 ```
 
-公众号关注后的自动回复可以这样写：
+返回：
 
-```text
-请发送你在平台上的账号，完成微信验证绑定。
+```json
+{
+  "binding_status": "bound",
+  "is_bound": true
+}
 ```
+
+即可发放免费额度。
+
+## 7. 验收标准
+
+必须验证这三件事：
+
+1. 第一次发送正确平台账号，绑定成功。
+2. 同一个微信号再次发送另一个平台账号，返回 `wechat_already_bound`，不能绑定第二个用户。
+3. 另一个微信号发送已绑定的平台账号，返回 `platform_account_already_bound`，不能抢占账号。
 
 ## 常见问题
 
 ### 能拿到真实微信号吗？
 
-不能。微信官方接口不会返回用户真实微信号、手机号、实名身份。
+不能。微信官方不会返回真实微信号、手机号、实名信息。本项目使用公众号下的 `OpenID`，足够实现「一个微信身份只能绑定一个平台账号」。
 
-本服务使用 `OpenID`。`OpenID` 是用户在某一个公众号下的唯一标识，足够完成“一个微信身份只能绑定一个平台账号”的反薅羊毛需求。
+### 为什么绑定状态里是 `wechat_subscribe_status: unchecked`？
 
-### 用户取关后怎么办？
+这表示公众号没有 `user/info` 权限或未开启相关能力。本项目仍可基于消息回调里的 `OpenID` 完成绑定。
 
-V1 绑定成功后不会自动解绑。你可以在发放后续额度前调用 `GET /v1/tenants/:tenantId/wechat/users/:openId` 二次确认 `subscribe` 状态。
+### 为什么用户发消息后项目收不到？
 
-### 为什么本地测试收不到微信回调？
+优先检查：
 
-微信服务器必须访问公网 URL。本地开发需要使用公网隧道或部署到一台公网服务器。
+- 消息推送 URL 是否是公网 HTTPS。
+- URL 中的 `{tenantId}` 是否和本项目控制台一致。
+- Token 是否完全一致。
+- 消息推送是否已启用。
+- 数据格式是否是 XML。
 
-### 什么时候需要加密模式？
+### 本地开发怎么暴露公网 URL？
 
-V1 为了最快落地使用明文模式。生产环境如果对消息内容传输有更高要求，再升级到兼容模式或安全模式，并接入 `EncodingAESKey` 解密。
+可以使用临时隧道：
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:3000
+```
+
+把生成的 `https://*.trycloudflare.com/wechat/{tenantId}/webhook` 填到微信消息推送 URL。
