@@ -4,8 +4,11 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { Readable } from 'node:stream';
 
 import { createApp } from '../src/server.js';
+
+const originalFetch = globalThis.fetch;
 
 function createSignature(token, timestamp, nonce) {
   return crypto
@@ -128,28 +131,67 @@ async function startServer({ tenantOverrides = {}, officialAccountClient, adminT
     )
   );
 
-  const { server } = await createApp({ configPath, dataPath, officialAccountClient, adminToken });
+  const { handleRequest } = await createApp({ configPath, dataPath, officialAccountClient, adminToken });
+  const baseUrl = 'http://127.0.0.1';
+  globalThis.fetch = async (url, options = {}) => {
+    const parsedUrl = new URL(String(url));
 
-  await new Promise((resolve) => {
-    server.listen(0, resolve);
-  });
+    if (parsedUrl.origin !== baseUrl) {
+      return originalFetch(url, options);
+    }
 
-  const address = server.address();
-  const baseUrl = `http://127.0.0.1:${address.port}`;
+    return dispatchRequest(handleRequest, parsedUrl, options);
+  };
 
   return {
     configPath,
     baseUrl,
     async close() {
-      await new Promise((resolve, reject) => {
-        server.close((error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      });
+      globalThis.fetch = originalFetch;
+    }
+  };
+}
+
+async function dispatchRequest(handleRequest, parsedUrl, options) {
+  const requestBody = options.body ? Buffer.from(String(options.body)) : Buffer.alloc(0);
+  const request = Readable.from(requestBody.length ? [requestBody] : []);
+  request.method = options.method ?? 'GET';
+  request.url = `${parsedUrl.pathname}${parsedUrl.search}`;
+  request.headers = Object.fromEntries(new Headers(options.headers ?? {}).entries());
+  request.socket = { remoteAddress: '127.0.0.1' };
+
+  const chunks = [];
+  let endResponse;
+  const finished = new Promise((resolve) => {
+    endResponse = resolve;
+  });
+  const response = {
+    statusCode: 200,
+    headers: {},
+    writeHead(statusCode, headers) {
+      this.statusCode = statusCode;
+      this.headers = headers;
+    },
+    end(payload = '') {
+      if (payload) {
+        chunks.push(Buffer.isBuffer(payload) ? payload : Buffer.from(String(payload)));
+      }
+      endResponse();
+    }
+  };
+
+  await handleRequest(request, response);
+  await finished;
+  const responseBody = Buffer.concat(chunks).toString('utf8');
+
+  return {
+    status: response.statusCode,
+    headers: response.headers,
+    async text() {
+      return responseBody;
+    },
+    async json() {
+      return JSON.parse(responseBody);
     }
   };
 }

@@ -154,7 +154,7 @@ export async function createApp({
   await store.ensureFile();
   const service = new BindingService({ store });
 
-  const server = http.createServer(async (request, response) => {
+  const requestHandler = async (request, response) => {
     try {
       const requestUrl = new URL(request.url, 'http://localhost');
       const match = matchRoute(request.method, requestUrl.pathname);
@@ -437,7 +437,8 @@ export async function createApp({
     } catch (error) {
       handleError(response, error);
     }
-  });
+  };
+  const server = http.createServer(requestHandler);
 
-  return { server, service, config };
+  return { server, service, config, handleRequest: requestHandler };
 }
