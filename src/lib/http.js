@@ -47,6 +47,21 @@ export function sendText(response, statusCode, payload) {
   response.end(payload);
 }
 
+export function sendHtml(response, statusCode, payload) {
+  response.writeHead(statusCode, { 'content-type': 'text/html; charset=utf-8' });
+  response.end(payload);
+}
+
+export function sendCss(response, statusCode, payload) {
+  response.writeHead(statusCode, { 'content-type': 'text/css; charset=utf-8' });
+  response.end(payload);
+}
+
+export function sendJavaScript(response, statusCode, payload) {
+  response.writeHead(statusCode, { 'content-type': 'application/javascript; charset=utf-8' });
+  response.end(payload);
+}
+
 export function handleError(response, error) {
   if (error instanceof HttpError) {
     sendJson(response, error.statusCode, {

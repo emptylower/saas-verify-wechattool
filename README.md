@@ -13,6 +13,7 @@ V1 采用最快落地方案：站长使用自己的微信公众号 `AppID`、`Ap
 - 强制 `1 个微信 OpenID <-> 1 个平台账号`，V1 不支持解绑。
 - 提供绑定状态查询接口，供 SaaS 后端决定是否发放免费额度。
 - 提供最小审计记录，方便排查冲突绑定、过期会话、异常消息。
+- 随服务启动内置 Web 控制台，用于保存公众号配置、查看教程和查询用户验证状态。
 
 ## 不解决什么
 
@@ -36,13 +37,32 @@ npm start
 - 配置文件：`config/integrations.example.json`
 - 数据文件：`data/store.json`
 - 监听端口：`3000`
+- 监听地址：`127.0.0.1`
+- 控制台：`http://127.0.0.1:3000/console`
 
 生产环境建议复制一份私有配置文件：
 
 ```bash
 cp config/integrations.example.json config/integrations.local.json
-WVB_CONFIG_PATH=./config/integrations.local.json npm start
+WVB_CONFIG_PATH=./config/integrations.local.json WVB_ADMIN_TOKEN=change-me HOST=0.0.0.0 npm start
 ```
+
+## Web 控制台
+
+启动服务后打开：
+
+```text
+http://127.0.0.1:3000/console
+```
+
+控制台可以：
+
+- 新增或更新租户配置，并长期保存到 `WVB_CONFIG_PATH` 指向的 JSON 文件。
+- 查看微信公众号接入教程和当前租户的 Webhook URL。
+- 查询某个 `tenantId + platformAccountId` 的微信验证状态。
+- 查看最近验证尝试，排查过期会话、发错账号和绑定冲突。
+
+如果部署在公网，必须设置 `WVB_ADMIN_TOKEN`，并在控制台顶部输入同一个 token。未设置 token 时，管理 API 只允许 localhost 访问。
 
 ## 配置示例
 

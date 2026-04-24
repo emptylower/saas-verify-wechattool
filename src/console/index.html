@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SaaS Verify WeChat Console</title>
+    <link rel="stylesheet" href="/console/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>SaaS Verify WeChat Console</h1>
+        <p>配置公众号接入，查看平台账号的微信验证状态。</p>
+      </div>
+      <div class="token-box">
+        <label for="adminToken">Admin Token</label>
+        <input id="adminToken" type="password" autocomplete="current-password" placeholder="WVB_ADMIN_TOKEN">
+        <button id="saveTokenButton" type="button">保存到本机浏览器</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel config-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>公众号配置</h2>
+            <p>长期保存到服务端配置文件。</p>
+          </div>
+          <button id="refreshButton" type="button">刷新</button>
+        </div>
+
+        <form id="tenantForm" class="form-grid">
+          <label>
+            Tenant ID
+            <input id="tenantId" name="tenantId" required placeholder="demo-tenant">
+          </label>
+          <label>
+            Host Client ID
+            <input id="clientId" name="clientId" required placeholder="demo-client">
+          </label>
+          <label>
+            Host Client Secret
+            <input id="clientSecret" name="clientSecret" required placeholder="仅服务端使用">
+          </label>
+          <label>
+            微信 Token
+            <input id="wechatToken" name="wechatToken" required placeholder="公众号服务器配置 Token">
+          </label>
+          <label>
+            微信 AppID
+            <input id="wechatAppId" name="wechatAppId" required placeholder="wx...">
+          </label>
+          <label>
+            微信 AppSecret
+            <input id="wechatAppSecret" name="wechatAppSecret" required placeholder="公众号开发者密码">
+          </label>
+          <button class="primary span-2" type="submit">保存配置</button>
+        </form>
+
+        <div class="tenant-list">
+          <h3>已配置租户</h3>
+          <div id="tenantList" class="table-like"></div>
+        </div>
+      </section>
+
+      <section class="panel guide-panel">
+        <h2>接入教程</h2>
+        <ol>
+          <li>登录微信公众号后台，进入开发者配置。</li>
+          <li>复制 `AppID` 和 `AppSecret` 到左侧表单。</li>
+          <li>生成一串随机 `Token`，同时填入公众号后台和左侧表单。</li>
+          <li>公众号服务器 URL 填写：<code id="webhookUrl">/wechat/{tenantId}/webhook</code></li>
+          <li>V1 选择明文模式，`EncodingAESKey` 先保存备用。</li>
+          <li>SaaS 后端先创建待绑定会话，再引导用户关注公众号并发送平台账号。</li>
+        </ol>
+        <div class="copy-row">
+          <input id="publicBaseUrl" placeholder="https://your-domain.com" value="">
+          <button id="copyWebhookButton" type="button">复制完整 Webhook URL</button>
+        </div>
+      </section>
+
+      <section class="panel status-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>用户验证状态</h2>
+            <p>按租户和平台账号查询已绑定状态。</p>
+          </div>
+        </div>
+
+        <form id="statusForm" class="query-row">
+          <input id="queryTenantId" required placeholder="tenantId">
+          <input id="queryPlatformAccountId" placeholder="平台账号，可留空查看最近绑定">
+          <button class="primary" type="submit">查询</button>
+        </form>
+
+        <div id="bindingResults" class="table-like"></div>
+      </section>
+
+      <section class="panel attempts-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>最近验证记录</h2>
+            <p>排查发错账号、过期会话和绑定冲突。</p>
+          </div>
+          <button id="refreshAttemptsButton" type="button">刷新记录</button>
+        </div>
+        <div id="attemptResults" class="table-like"></div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/console/app.js"></script>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -98,7 +98,7 @@ async function listAttempts(app, platformAccountId) {
   };
 }
 
-async function startServer({ tenantOverrides = {}, officialAccountClient } = {}) {
+async function startServer({ tenantOverrides = {}, officialAccountClient, adminToken = '' } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'wechat-binding-server-'));
   const configPath = path.join(directory, 'integrations.json');
   const dataPath = path.join(directory, 'store.json');
@@ -128,7 +128,7 @@ async function startServer({ tenantOverrides = {}, officialAccountClient } = {})
     )
   );
 
-  const { server } = await createApp({ configPath, dataPath, officialAccountClient });
+  const { server } = await createApp({ configPath, dataPath, officialAccountClient, adminToken });
 
   await new Promise((resolve) => {
     server.listen(0, resolve);
@@ -138,6 +138,7 @@ async function startServer({ tenantOverrides = {}, officialAccountClient } = {})
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   return {
+    configPath,
     baseUrl,
     async close() {
       await new Promise((resolve, reject) => {
@@ -224,6 +225,106 @@ test('supports pending bind intent creation, webhook binding, and query unlock s
     assert.equal(auditResponse.status, 200);
     assert.equal(auditBody.attempts.length, 1);
     assert.equal(auditBody.attempts[0].tenantId, 'tenant-a');
+  } finally {
+    await app.close();
+  }
+});
+
+test('serves embedded console assets with admin workflow entrypoint', async () => {
+  const app = await startServer();
+
+  try {
+    const consoleResponse = await fetch(`${app.baseUrl}/console`);
+    const consoleBody = await consoleResponse.text();
+    const scriptResponse = await fetch(`${app.baseUrl}/console/app.js`);
+
+    assert.equal(consoleResponse.status, 200);
+    assert.match(consoleBody, /SaaS Verify WeChat Console/);
+    assert.equal(scriptResponse.status, 200);
+    assert.match(await scriptResponse.text(), /v1\/admin\/tenants/);
+  } finally {
+    await app.close();
+  }
+});
+
+test('admin console API persists tenant configuration to config file', async () => {
+  const app = await startServer({ adminToken: 'admin-secret' });
+
+  try {
+    const unauthorizedResponse = await fetch(`${app.baseUrl}/v1/admin/tenants`);
+    assert.equal(unauthorizedResponse.status, 401);
+
+    const saveResponse = await fetch(`${app.baseUrl}/v1/admin/tenants/tenant-console`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        'x-admin-token': 'admin-secret'
+      },
+      body: JSON.stringify({
+        clientId: 'client-console',
+        clientSecret: 'secret-console',
+        wechatToken: 'wechat-console-token',
+        wechatAppId: 'wx-console',
+        wechatAppSecret: 'wechat-console-secret'
+      })
+    });
+    const saveBody = await saveResponse.json();
+    const persistedConfig = JSON.parse(await readFile(app.configPath, 'utf8'));
+
+    assert.equal(saveResponse.status, 200);
+    assert.equal(saveBody.tenant.tenant_id, 'tenant-console');
+    assert.equal(persistedConfig.tenants['tenant-console'].wechatAppId, 'wx-console');
+
+    const listResponse = await fetch(`${app.baseUrl}/v1/admin/tenants`, {
+      headers: {
+        'x-admin-token': 'admin-secret'
+      }
+    });
+    const listBody = await listResponse.json();
+
+    assert.equal(listResponse.status, 200);
+    assert.ok(listBody.tenants.some((tenant) => tenant.tenant_id === 'tenant-console'));
+  } finally {
+    await app.close();
+  }
+});
+
+test('admin console API lists binding status and recent attempts', async () => {
+  const app = await startServer({ adminToken: 'admin-secret' });
+
+  try {
+    await createPendingIntent(app, 'alice');
+    await sendWebhookMessage(app, {
+      fromUserName: 'wechat-user-a',
+      content: 'alice',
+      messageId: 'console-1001',
+      nonce: 'nonce-console-1001'
+    });
+
+    const bindingsResponse = await fetch(
+      `${app.baseUrl}/v1/admin/bindings?tenantId=tenant-a&platformAccountId=alice`,
+      {
+        headers: {
+          'x-admin-token': 'admin-secret'
+        }
+      }
+    );
+    const bindingsBody = await bindingsResponse.json();
+
+    assert.equal(bindingsResponse.status, 200);
+    assert.equal(bindingsBody.bindings.length, 1);
+    assert.equal(bindingsBody.bindings[0].platform_account_id, 'alice');
+    assert.equal(bindingsBody.bindings[0].binding_status, 'bound');
+
+    const attemptsResponse = await fetch(`${app.baseUrl}/v1/admin/attempts?tenantId=tenant-a`, {
+      headers: {
+        'x-admin-token': 'admin-secret'
+      }
+    });
+    const attemptsBody = await attemptsResponse.json();
+
+    assert.equal(attemptsResponse.status, 200);
+    assert.equal(attemptsBody.attempts[0].outcome, 'bound');
   } finally {
     await app.close();
   }

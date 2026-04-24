@@ -1,9 +1,10 @@
 import { createApp } from './server.js';
 
 const port = Number.parseInt(process.env.PORT ?? '3000', 10);
+const host = process.env.HOST ?? '127.0.0.1';
 
 const { server } = await createApp();
 
-server.listen(port, () => {
-  console.log(`WeChat binding plugin listening on port ${port}`);
+server.listen(port, host, () => {
+  console.log(`WeChat binding plugin listening on http://${host}:${port}`);
 });

@@ -1,10 +1,22 @@
 import http from 'node:http';
-import { URL } from 'node:url';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath, URL } from 'node:url';
 
-import { authenticateHost } from './lib/auth.js';
-import { loadConfig, getTenantConfig } from './lib/config.js';
+import { authenticateAdmin, authenticateHost } from './lib/auth.js';
+import { loadConfig, getTenantConfig, listTenantSummaries, upsertTenantConfig } from './lib/config.js';
 import { HttpError } from './lib/errors.js';
-import { readJsonBody, sendJson, sendText, sendXml, handleError, readRequestBody } from './lib/http.js';
+import {
+  readJsonBody,
+  sendCss,
+  sendHtml,
+  sendJavaScript,
+  sendJson,
+  sendText,
+  sendXml,
+  handleError,
+  readRequestBody
+} from './lib/http.js';
 import { JsonStore } from './lib/store.js';
 import { BindingService } from './lib/service.js';
 import { WeChatOfficialAccountClient } from './lib/wechat_api.js';
@@ -13,8 +25,38 @@ import { buildWeChatTextResponse, parseWeChatXml, verifyWeChatSignature } from '
 function matchRoute(method, pathname) {
   const segments = pathname.split('/').filter(Boolean);
 
+  if (method === 'GET' && (pathname === '/' || pathname === '/console' || pathname === '/console/')) {
+    return { name: 'consoleIndex', params: {} };
+  }
+
+  if (method === 'GET' && pathname === '/console/styles.css') {
+    return { name: 'consoleStyles', params: {} };
+  }
+
+  if (method === 'GET' && pathname === '/console/app.js') {
+    return { name: 'consoleScript', params: {} };
+  }
+
   if (method === 'GET' && pathname === '/health') {
     return { name: 'health', params: {} };
+  }
+
+  if (segments[0] === 'v1' && segments[1] === 'admin') {
+    if (method === 'GET' && segments[2] === 'tenants' && segments.length === 3) {
+      return { name: 'adminListTenants', params: {} };
+    }
+
+    if (method === 'PUT' && segments[2] === 'tenants' && segments.length === 4) {
+      return { name: 'adminUpsertTenant', params: { tenantId: decodeURIComponent(segments[3]) } };
+    }
+
+    if (method === 'GET' && segments[2] === 'bindings' && segments.length === 3) {
+      return { name: 'adminListBindings', params: {} };
+    }
+
+    if (method === 'GET' && segments[2] === 'attempts' && segments.length === 3) {
+      return { name: 'adminListAttempts', params: {} };
+    }
   }
 
   if (segments[0] === 'v1' && segments[1] === 'tenants' && segments[3] === 'pending-bind-intents') {
@@ -103,9 +145,11 @@ function getMessageReply(result) {
 export async function createApp({
   configPath = process.env.WVB_CONFIG_PATH ?? './config/integrations.example.json',
   dataPath = process.env.WVB_DATA_PATH ?? './data/store.json',
+  adminToken = process.env.WVB_ADMIN_TOKEN ?? '',
   officialAccountClient = new WeChatOfficialAccountClient()
 } = {}) {
-  const config = await loadConfig(configPath);
+  let config = await loadConfig(configPath);
+  const consoleDirectory = path.join(path.dirname(fileURLToPath(import.meta.url)), 'console');
   const store = new JsonStore(dataPath);
   await store.ensureFile();
   const service = new BindingService({ store });
@@ -120,9 +164,83 @@ export async function createApp({
         return;
       }
 
+      if (match.name === 'consoleIndex') {
+        const html = await readFile(path.join(consoleDirectory, 'index.html'), 'utf8');
+        sendHtml(response, 200, html);
+        return;
+      }
+
+      if (match.name === 'consoleStyles') {
+        const css = await readFile(path.join(consoleDirectory, 'styles.css'), 'utf8');
+        sendCss(response, 200, css);
+        return;
+      }
+
+      if (match.name === 'consoleScript') {
+        const script = await readFile(path.join(consoleDirectory, 'app.js'), 'utf8');
+        sendJavaScript(response, 200, script);
+        return;
+      }
+
       if (match.name === 'health') {
         sendJson(response, 200, { status: 'ok' });
         return;
+      }
+
+      if (match.name.startsWith('admin')) {
+        authenticateAdmin(request, adminToken);
+
+        if (match.name === 'adminListTenants') {
+          sendJson(response, 200, {
+            tenants: listTenantSummaries(config),
+            console_auth: {
+              admin_token_required: Boolean(adminToken)
+            }
+          });
+          return;
+        }
+
+        if (match.name === 'adminUpsertTenant') {
+          const body = await readJsonBody(request);
+          const tenant = await upsertTenantConfig(configPath, config, match.params.tenantId, body);
+          config = await loadConfig(configPath);
+          sendJson(response, 200, { tenant });
+          return;
+        }
+
+        if (match.name === 'adminListBindings') {
+          const limitParam = requestUrl.searchParams.get('limit');
+          const limit = limitParam ? Number.parseInt(limitParam, 10) : 100;
+          const tenantId = requestUrl.searchParams.get('tenantId');
+          const platformAccountId = requestUrl.searchParams.get('platformAccountId');
+          const bindings = await service.listBindings({
+            tenantId,
+            platformAccountId,
+            limit: Number.isInteger(limit) && limit > 0 ? limit : 100
+          });
+
+          sendJson(response, 200, { bindings });
+          return;
+        }
+
+        if (match.name === 'adminListAttempts') {
+          const limitParam = requestUrl.searchParams.get('limit');
+          const limit = limitParam ? Number.parseInt(limitParam, 10) : 100;
+          const tenantId = requestUrl.searchParams.get('tenantId');
+          const platformAccountId = requestUrl.searchParams.get('platformAccountId');
+
+          if (!tenantId) {
+            throw new HttpError(400, 'tenant_id_required', 'tenantId is required.');
+          }
+
+          const attempts = await service.listAttempts({
+            tenantId,
+            platformAccountId,
+            limit: Number.isInteger(limit) && limit > 0 ? limit : 100
+          });
+          sendJson(response, 200, { attempts });
+          return;
+        }
       }
 
       if (match.name === 'verifyWeChatWebhook') {

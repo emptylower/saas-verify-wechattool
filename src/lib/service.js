@@ -174,6 +174,29 @@ export class BindingService {
     });
   }
 
+  async listBindings({ tenantId = null, platformAccountId = null, limit = 100 }) {
+    const normalizedPlatformAccountId = platformAccountId ? normalizePlatformAccountId(platformAccountId) : null;
+
+    return this.store.read((state) =>
+      state.bindings
+        .filter((binding) => (tenantId ? binding.tenantId === tenantId : true))
+        .filter((binding) =>
+          normalizedPlatformAccountId ? binding.platformAccountId === normalizedPlatformAccountId : true
+        )
+        .slice(-limit)
+        .reverse()
+        .map((binding) => ({
+          tenant_id: binding.tenantId,
+          platform_account_id: binding.platformAccountId,
+          binding_status: binding.status,
+          bound_at: binding.boundAt,
+          wechat_binding_ref: binding.wechatBindingRef,
+          wechat_official_account_appid: binding.wechatAppId ?? null,
+          wechat_subscribe_status: binding.wechatSubscribeStatus ?? null
+        }))
+    );
+  }
+
   async processWeChatMessage({
     tenantId,
     wechatOpenId,

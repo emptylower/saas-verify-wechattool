@@ -152,3 +152,47 @@ curl -sS -X POST "http://127.0.0.1:3000/wechat/demo-tenant/webhook?signature=$SI
 ```
 
 预期返回 XML 文本消息，内容包含 `Binding completed successfully.`。
+
+## 控制台管理 API
+
+如果设置了 `WVB_ADMIN_TOKEN`，需要带上：
+
+```bash
+-H 'x-admin-token: change-me'
+```
+
+列出租户：
+
+```bash
+curl -sS http://127.0.0.1:3000/v1/admin/tenants \
+  -H 'x-admin-token: change-me'
+```
+
+保存租户配置：
+
+```bash
+curl -sS -X PUT http://127.0.0.1:3000/v1/admin/tenants/demo-tenant \
+  -H 'content-type: application/json' \
+  -H 'x-admin-token: change-me' \
+  -d '{
+    "clientId": "demo-client",
+    "clientSecret": "demo-secret",
+    "wechatToken": "demo-wechat-token",
+    "wechatAppId": "wx-your-official-account-appid",
+    "wechatAppSecret": "your-official-account-appsecret"
+  }'
+```
+
+控制台查询绑定状态：
+
+```bash
+curl -sS 'http://127.0.0.1:3000/v1/admin/bindings?tenantId=demo-tenant&platformAccountId=alice' \
+  -H 'x-admin-token: change-me'
+```
+
+控制台查询最近验证尝试：
+
+```bash
+curl -sS 'http://127.0.0.1:3000/v1/admin/attempts?tenantId=demo-tenant&platformAccountId=alice' \
+  -H 'x-admin-token: change-me'
+```

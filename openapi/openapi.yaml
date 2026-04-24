@@ -125,6 +125,73 @@ paths:
                 $ref: '#/components/schemas/WeChatFollowers'
         '400':
           description: WeChat official account credentials are not configured
+  /v1/admin/tenants:
+    get:
+      summary: List console tenant configurations
+      security:
+        - AdminTokenHeader: []
+      responses:
+        '200':
+          description: Configured tenants
+  /v1/admin/tenants/{tenantId}:
+    put:
+      summary: Create or update a console tenant configuration
+      security:
+        - AdminTokenHeader: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantConfigInput'
+      responses:
+        '200':
+          description: Tenant configuration saved
+  /v1/admin/bindings:
+    get:
+      summary: List binding statuses for the Web console
+      security:
+        - AdminTokenHeader: []
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: platformAccountId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Binding status rows
+  /v1/admin/attempts:
+    get:
+      summary: List recent verification attempts for the Web console
+      security:
+        - AdminTokenHeader: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: platformAccountId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Attempt rows
   /wechat/{tenantId}/webhook:
     get:
       summary: Verify WeChat webhook configuration
@@ -193,6 +260,11 @@ components:
       in: header
       name: x-client-secret
       description: Tenant-scoped host secret for server-to-server plugin calls.
+    AdminTokenHeader:
+      type: apiKey
+      in: header
+      name: x-admin-token
+      description: Optional Web console admin token from WVB_ADMIN_TOKEN.
   parameters:
     TenantId:
       name: tenantId
@@ -288,4 +360,23 @@ components:
           items:
             type: string
         next_open_id:
+          type: string
+    TenantConfigInput:
+      type: object
+      required:
+        - clientId
+        - clientSecret
+        - wechatToken
+        - wechatAppId
+        - wechatAppSecret
+      properties:
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        wechatToken:
+          type: string
+        wechatAppId:
+          type: string
+        wechatAppSecret:
           type: string
