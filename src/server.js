@@ -19,6 +19,7 @@ import {
 } from './lib/http.js';
 import { JsonStore } from './lib/store.js';
 import { BindingService } from './lib/service.js';
+import { notifyVerificationResult, verifyHostAccount } from './lib/tenant_callbacks.js';
 import { WeChatOfficialAccountClient } from './lib/wechat_api.js';
 import { buildWeChatTextResponse, parseWeChatXml, verifyWeChatSignature } from './lib/wechat.js';
 
@@ -143,10 +144,55 @@ function getMessageReply(result) {
       return 'This platform account is already bound to another WeChat account.';
     case 'rejected_missing_or_expired_intent':
       return 'No active binding session exists for this platform account. Please restart verification in the platform.';
+    case 'rejected_host_account_verification':
+      return 'The platform could not verify this account. Please confirm the account in the platform and try again.';
     case 'rejected_malformed':
       return 'The message format is invalid. Please send your platform account identifier.';
     default:
       return 'The bind request could not be processed.';
+  }
+}
+
+function createAccountVerifyPayload({ tenantId, tenantConfig, message, platformAccountId, wechatProfile }) {
+  return {
+    type: 'account.verify',
+    tenant_id: tenantId,
+    platform_account_id: platformAccountId,
+    wechat_open_id: message.fromUserName,
+    wechat_official_account_appid: tenantConfig.wechatAppId ?? null,
+    wechat_subscribe_status: wechatProfile ? (wechatProfile.subscribe ? 'subscribed' : 'unsubscribed') : 'unchecked',
+    message_id: message.messageId,
+    received_at: new Date().toISOString()
+  };
+}
+
+function createVerificationResultPayload({ tenantId, tenantConfig, message, result }) {
+  const binding = result.binding ?? null;
+
+  return {
+    type: 'wechat.binding.result',
+    tenant_id: tenantId,
+    platform_account_id: binding?.platformAccountId ?? message.content,
+    outcome: result.outcome,
+    is_bound: Boolean(binding),
+    reason_code: result.reasonCode ?? null,
+    wechat_binding_ref: binding?.wechatBindingRef ?? null,
+    wechat_official_account_appid: binding?.wechatAppId ?? tenantConfig.wechatAppId ?? null,
+    wechat_subscribe_status: binding?.wechatSubscribeStatus ?? null,
+    bound_at: binding?.boundAt ?? null,
+    message_id: message.messageId,
+    occurred_at: new Date().toISOString()
+  };
+}
+
+async function notifyHostIfConfigured(tenantConfig, payload) {
+  const result = await notifyVerificationResult(tenantConfig, payload);
+
+  if (result.configured && !result.ok) {
+    console.warn('Verification result webhook failed', {
+      status: result.status,
+      body: result.body
+    });
   }
 }
 
@@ -362,14 +408,36 @@ export async function createApp({
           return;
         }
 
+        const hostAccountVerification = await verifyHostAccount(
+          tenantConfig,
+          createAccountVerifyPayload({
+            tenantId: match.params.tenantId,
+            tenantConfig,
+            message,
+            platformAccountId: message.content,
+            wechatProfile
+          })
+        );
+
         const result = await service.processWeChatMessage({
           tenantId: match.params.tenantId,
           wechatOpenId: message.fromUserName,
           platformAccountId: message.content,
           messageId: message.messageId,
           wechatAppId: tenantConfig.wechatAppId ?? null,
-          wechatProfile
+          wechatProfile,
+          hostAccountVerification
         });
+
+        await notifyHostIfConfigured(
+          tenantConfig,
+          createVerificationResultPayload({
+            tenantId: match.params.tenantId,
+            tenantConfig,
+            message,
+            result
+          })
+        );
 
         const reply = buildWeChatTextResponse({
           toUserName: message.fromUserName,

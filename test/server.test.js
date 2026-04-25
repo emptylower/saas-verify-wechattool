@@ -102,7 +102,16 @@ async function listAttempts(app, platformAccountId) {
   };
 }
 
-async function startServer({ tenantOverrides = {}, officialAccountClient, adminToken = '' } = {}) {
+function createJsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'content-type': 'application/json'
+    }
+  });
+}
+
+async function startServer({ tenantOverrides = {}, officialAccountClient, adminToken = '', externalFetch } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'wechat-binding-server-'));
   const configPath = path.join(directory, 'integrations.json');
   const dataPath = path.join(directory, 'store.json');
@@ -138,6 +147,12 @@ async function startServer({ tenantOverrides = {}, officialAccountClient, adminT
     const parsedUrl = new URL(String(url));
 
     if (parsedUrl.origin !== baseUrl) {
+      const externalResponse = await externalFetch?.(parsedUrl, options);
+
+      if (externalResponse) {
+        return externalResponse;
+      }
+
       return originalFetch(url, options);
     }
 
@@ -319,7 +334,10 @@ test('admin console API persists tenant configuration to config file', async () 
         clientSecret: 'secret-console',
         wechatToken: 'wechat-console-token',
         wechatAppId: 'wx-console',
-        wechatAppSecret: 'wechat-console-secret'
+        wechatAppSecret: 'wechat-console-secret',
+        accountVerifyUrl: 'https://saas.example.test/wechat/verify-account',
+        verificationWebhookUrl: 'https://saas.example.test/wechat/result',
+        webhookSecret: 'callback-secret'
       })
     });
     const saveBody = await saveResponse.json();
@@ -328,6 +346,15 @@ test('admin console API persists tenant configuration to config file', async () 
     assert.equal(saveResponse.status, 200);
     assert.equal(saveBody.tenant.tenant_id, 'tenant-console');
     assert.equal(persistedConfig.tenants['tenant-console'].wechatAppId, 'wx-console');
+    assert.equal(
+      persistedConfig.tenants['tenant-console'].accountVerifyUrl,
+      'https://saas.example.test/wechat/verify-account'
+    );
+    assert.equal(
+      persistedConfig.tenants['tenant-console'].verificationWebhookUrl,
+      'https://saas.example.test/wechat/result'
+    );
+    assert.equal(persistedConfig.tenants['tenant-console'].webhookSecret, 'callback-secret');
 
     const listResponse = await fetch(`${app.baseUrl}/v1/admin/tenants`, {
       headers: {
@@ -337,7 +364,10 @@ test('admin console API persists tenant configuration to config file', async () 
     const listBody = await listResponse.json();
 
     assert.equal(listResponse.status, 200);
-    assert.ok(listBody.tenants.some((tenant) => tenant.tenant_id === 'tenant-console'));
+    const consoleTenant = listBody.tenants.find((tenant) => tenant.tenant_id === 'tenant-console');
+    assert.equal(consoleTenant.account_verify_url, 'https://saas.example.test/wechat/verify-account');
+    assert.equal(consoleTenant.verification_webhook_url, 'https://saas.example.test/wechat/result');
+    assert.equal(consoleTenant.has_webhook_secret, true);
   } finally {
     await app.close();
   }
@@ -560,6 +590,130 @@ test('records audit attempt when bind message is malformed', async () => {
     assert.equal(body.attempts.length, 1);
     assert.equal(body.attempts[0].outcome, 'rejected_malformed');
     assert.equal(body.attempts[0].reasonCode, 'missing_platform_account_id');
+  } finally {
+    await app.close();
+  }
+});
+
+test('verifies candidate account with SaaS host and notifies binding result', async () => {
+  const callbackRequests = [];
+  const app = await startServer({
+    tenantOverrides: {
+      'tenant-a': {
+        accountVerifyUrl: 'https://saas.example.test/wechat/verify-account',
+        verificationWebhookUrl: 'https://saas.example.test/wechat/result',
+        webhookSecret: 'callback-secret'
+      }
+    },
+    externalFetch: async (url, options) => {
+      const body = JSON.parse(String(options.body));
+      callbackRequests.push({
+        pathname: url.pathname,
+        event: options.headers['x-wvb-event'],
+        signature: options.headers['x-wvb-signature'],
+        body
+      });
+
+      if (url.pathname === '/wechat/verify-account') {
+        return createJsonResponse({ allowed: true });
+      }
+
+      if (url.pathname === '/wechat/result') {
+        return createJsonResponse({ received: true });
+      }
+
+      return null;
+    }
+  });
+
+  try {
+    await createPendingIntent(app, 'alice');
+    const response = await sendWebhookMessage(app, {
+      fromUserName: 'wechat-openid-callback',
+      content: 'alice',
+      messageId: 'callback-1'
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(callbackRequests.length, 2);
+    assert.equal(callbackRequests[0].event, 'account.verify');
+    assert.equal(callbackRequests[0].body.platform_account_id, 'alice');
+    assert.equal(callbackRequests[0].body.wechat_open_id, 'wechat-openid-callback');
+    assert.match(callbackRequests[0].signature, /^sha256=/);
+    assert.equal(callbackRequests[1].event, 'wechat.binding.result');
+    assert.equal(callbackRequests[1].body.outcome, 'bound');
+    assert.equal(callbackRequests[1].body.is_bound, true);
+    assert.equal(callbackRequests[1].body.platform_account_id, 'alice');
+
+    const statusResponse = await fetch(`${app.baseUrl}/v1/tenants/tenant-a/bindings/alice`, {
+      headers: {
+        'x-client-id': tenantMetadata('tenant-a').clientId,
+        'x-client-secret': tenantMetadata('tenant-a').clientSecret
+      }
+    });
+    const statusBody = await statusResponse.json();
+
+    assert.equal(statusBody.is_bound, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test('rejects binding when SaaS host account verification denies the candidate', async () => {
+  const callbackRequests = [];
+  const app = await startServer({
+    tenantOverrides: {
+      'tenant-a': {
+        accountVerifyUrl: 'https://saas.example.test/wechat/verify-account',
+        verificationWebhookUrl: 'https://saas.example.test/wechat/result',
+        webhookSecret: 'callback-secret'
+      }
+    },
+    externalFetch: async (url, options) => {
+      const body = JSON.parse(String(options.body));
+      callbackRequests.push({ pathname: url.pathname, event: options.headers['x-wvb-event'], body });
+
+      if (url.pathname === '/wechat/verify-account') {
+        return createJsonResponse({ allowed: false, reasonCode: 'account_not_allowed' });
+      }
+
+      if (url.pathname === '/wechat/result') {
+        return createJsonResponse({ received: true });
+      }
+
+      return null;
+    }
+  });
+
+  try {
+    await createPendingIntent(app, 'alice');
+    const response = await sendWebhookMessage(app, {
+      fromUserName: 'wechat-openid-denied',
+      content: 'alice',
+      messageId: 'callback-denied-1'
+    });
+    const responseText = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(responseText, /platform could not verify/i);
+    assert.equal(callbackRequests.length, 2);
+    assert.equal(callbackRequests[1].event, 'wechat.binding.result');
+    assert.equal(callbackRequests[1].body.outcome, 'rejected_host_account_verification');
+    assert.equal(callbackRequests[1].body.is_bound, false);
+    assert.equal(callbackRequests[1].body.reason_code, 'account_not_allowed');
+
+    const statusResponse = await fetch(`${app.baseUrl}/v1/tenants/tenant-a/bindings/alice`, {
+      headers: {
+        'x-client-id': tenantMetadata('tenant-a').clientId,
+        'x-client-secret': tenantMetadata('tenant-a').clientSecret
+      }
+    });
+    const statusBody = await statusResponse.json();
+
+    assert.equal(statusBody.is_bound, false);
+
+    const { body: attemptsBody } = await listAttempts(app, 'alice');
+    assert.equal(attemptsBody.attempts[0].reasonCode, 'account_not_allowed');
   } finally {
     await app.close();
   }

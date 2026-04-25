@@ -150,6 +150,21 @@
                 <td>公众号详情页</td>
                 <td>用于换取 access_token；如果公众号没有 user/info 权限，绑定仍可基于消息 OpenID 完成。</td>
               </tr>
+              <tr>
+                <td>账号校验 URL</td>
+                <td>SaaS 后端</td>
+                <td>收到公众号消息后，本服务先调用它确认该账号是否允许绑定。</td>
+              </tr>
+              <tr>
+                <td>结果通知 URL</td>
+                <td>SaaS 后端</td>
+                <td>绑定成功或失败后，本服务主动把结果通知给 SaaS。</td>
+              </tr>
+              <tr>
+                <td>回调签名密钥</td>
+                <td>你自己定义</td>
+                <td>用于给账号校验和结果通知请求生成 HMAC 签名。</td>
+              </tr>
             </tbody>
           </table>
         </section>

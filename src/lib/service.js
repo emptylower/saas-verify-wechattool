@@ -203,7 +203,8 @@ export class BindingService {
     platformAccountId,
     messageId = null,
     wechatAppId = null,
-    wechatProfile = null
+    wechatProfile = null,
+    hostAccountVerification = null
   }) {
     const normalizedPlatformAccountId = normalizePlatformAccountId(platformAccountId);
 
@@ -332,6 +333,26 @@ export class BindingService {
           outcome: attempt.outcome,
           reasonCode: attempt.reasonCode,
           statusText: 'No active pending bind intent exists for this platform account.'
+        };
+      }
+
+      if (hostAccountVerification?.allowed === false) {
+        const attempt = createAttemptRecord({
+          attemptAt,
+          tenantId,
+          messageId,
+          pendingIntentId: matchingIntent.id,
+          pendingIntentFingerprint: matchingIntent.id.slice(0, 8),
+          candidatePlatformAccountId: normalizedPlatformAccountId,
+          candidateWechatOpenId: wechatOpenId,
+          outcome: 'rejected_host_account_verification',
+          reasonCode: hostAccountVerification.reasonCode ?? 'host_account_rejected'
+        });
+        state.attempts.push(attempt);
+        return {
+          outcome: attempt.outcome,
+          reasonCode: attempt.reasonCode,
+          statusText: 'The host platform rejected this account verification.'
         };
       }
 

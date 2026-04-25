@@ -380,3 +380,12 @@ components:
           type: string
         wechatAppSecret:
           type: string
+        accountVerifyUrl:
+          type: string
+          description: Optional SaaS endpoint called before binding to confirm the candidate account is allowed.
+        verificationWebhookUrl:
+          type: string
+          description: Optional SaaS endpoint notified after every WeChat binding result.
+        webhookSecret:
+          type: string
+          description: Optional shared secret used to sign SaaS callback requests.

@@ -75,7 +75,10 @@ http://127.0.0.1:3000/console
       "clientSecret": "demo-secret",
       "wechatToken": "demowechattoken",
       "wechatAppId": "wx-your-official-account-appid",
-      "wechatAppSecret": "your-official-account-appsecret"
+      "wechatAppSecret": "your-official-account-appsecret",
+      "accountVerifyUrl": "https://your-saas.example.com/api/wechat/verify-account",
+      "verificationWebhookUrl": "https://your-saas.example.com/api/wechat/result",
+      "webhookSecret": "shared-callback-signing-secret"
     }
   }
 }
@@ -86,6 +89,9 @@ http://127.0.0.1:3000/console
 - `clientId` / `clientSecret`：SaaS 后端调用本服务 API 的租户鉴权凭证。
 - `wechatToken`：微信开发者平台「消息推送」配置中的 `Token`，建议使用微信侧随机生成值，不要包含短横线。
 - `wechatAppId` / `wechatAppSecret`：微信公众号开发者凭据，用于获取 `access_token`、查询关注状态、拉关注者 OpenID 列表。
+- `accountVerifyUrl`：可选。用户在公众号发送账号后，本服务先调用 SaaS 确认该账号是否允许绑定。
+- `verificationWebhookUrl`：可选。绑定成功或失败后，本服务主动通知 SaaS 最终结果。
+- `webhookSecret`：可选。用于给上述两个 SaaS 回调添加 `x-wvb-signature` HMAC 签名。
 
 ## 主要接口
 
@@ -116,7 +122,7 @@ npm run lint
 npm run build
 ```
 
-当前测试覆盖后端绑定主链路、签名校验、关注状态校验、双向唯一绑定、审计记录、微信 API 客户端缓存和无凭据降级行为。
+当前测试覆盖后端绑定主链路、签名校验、关注状态校验、SaaS 账号校验回调、结果通知回调、双向唯一绑定、审计记录、微信 API 客户端缓存和无凭据降级行为。
 
 ## 重要边界
 

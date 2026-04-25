@@ -29,6 +29,9 @@ export function listTenantSummaries(config) {
     has_wechat_token: Boolean(tenantConfig.wechatToken),
     wechat_appid: tenantConfig.wechatAppId ?? '',
     has_wechat_appsecret: Boolean(tenantConfig.wechatAppSecret),
+    account_verify_url: tenantConfig.accountVerifyUrl ?? '',
+    verification_webhook_url: tenantConfig.verificationWebhookUrl ?? '',
+    has_webhook_secret: Boolean(tenantConfig.webhookSecret),
     webhook_path: `/wechat/${tenantId}/webhook`
   }));
 }
@@ -52,7 +55,10 @@ export async function upsertTenantConfig(configPath, config, tenantId, input) {
     clientSecret: normalizeConfigValue(input.clientSecret),
     wechatToken: normalizeConfigValue(input.wechatToken),
     wechatAppId: normalizeConfigValue(input.wechatAppId),
-    wechatAppSecret: normalizeConfigValue(input.wechatAppSecret)
+    wechatAppSecret: normalizeConfigValue(input.wechatAppSecret),
+    accountVerifyUrl: normalizeConfigValue(input.accountVerifyUrl),
+    verificationWebhookUrl: normalizeConfigValue(input.verificationWebhookUrl),
+    webhookSecret: normalizeConfigValue(input.webhookSecret)
   };
 
   config.tenants[normalizedTenantId] = tenantConfig;
@@ -65,6 +71,9 @@ export async function upsertTenantConfig(configPath, config, tenantId, input) {
     has_wechat_token: Boolean(tenantConfig.wechatToken),
     wechat_appid: tenantConfig.wechatAppId,
     has_wechat_appsecret: Boolean(tenantConfig.wechatAppSecret),
+    account_verify_url: tenantConfig.accountVerifyUrl,
+    verification_webhook_url: tenantConfig.verificationWebhookUrl,
+    has_webhook_secret: Boolean(tenantConfig.webhookSecret),
     webhook_path: `/wechat/${normalizedTenantId}/webhook`
   };
 }

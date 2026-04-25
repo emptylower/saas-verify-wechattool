@@ -14,6 +14,9 @@ const elements = {
   wechatToken: document.querySelector('#wechatToken'),
   wechatAppId: document.querySelector('#wechatAppId'),
   wechatAppSecret: document.querySelector('#wechatAppSecret'),
+  accountVerifyUrl: document.querySelector('#accountVerifyUrl'),
+  verificationWebhookUrl: document.querySelector('#verificationWebhookUrl'),
+  webhookSecret: document.querySelector('#webhookSecret'),
   tenantList: document.querySelector('#tenantList'),
   webhookUrl: document.querySelector('#webhookUrl'),
   publicBaseUrl: document.querySelector('#publicBaseUrl'),
@@ -96,7 +99,9 @@ function renderTenants() {
     const credentialText = [
       tenant.has_client_secret ? 'Host OK' : 'Host 缺失',
       tenant.has_wechat_token ? 'Token OK' : 'Token 缺失',
-      tenant.has_wechat_appsecret ? 'AppSecret OK' : 'AppSecret 缺失'
+      tenant.has_wechat_appsecret ? 'AppSecret OK' : 'AppSecret 缺失',
+      tenant.account_verify_url ? '校验 OK' : '未接校验',
+      tenant.verification_webhook_url ? '通知 OK' : '未接通知'
     ].join(' · ');
 
     rows.push(`<div class="row">
@@ -127,6 +132,9 @@ function selectTenant(tenantId) {
   elements.wechatToken.value = '';
   elements.wechatAppId.value = tenant.wechat_appid;
   elements.wechatAppSecret.value = '';
+  elements.accountVerifyUrl.value = tenant.account_verify_url ?? '';
+  elements.verificationWebhookUrl.value = tenant.verification_webhook_url ?? '';
+  elements.webhookSecret.value = '';
   elements.queryTenantId.value = tenant.tenant_id;
   updateWebhookPreview();
   refreshBindings();
@@ -159,7 +167,10 @@ async function saveTenant(event) {
       clientSecret: elements.clientSecret.value,
       wechatToken: elements.wechatToken.value,
       wechatAppId: elements.wechatAppId.value,
-      wechatAppSecret: elements.wechatAppSecret.value
+      wechatAppSecret: elements.wechatAppSecret.value,
+      accountVerifyUrl: elements.accountVerifyUrl.value,
+      verificationWebhookUrl: elements.verificationWebhookUrl.value,
+      webhookSecret: elements.webhookSecret.value
     })
   });
 

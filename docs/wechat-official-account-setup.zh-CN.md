@@ -108,6 +108,9 @@ http://127.0.0.1:3000/console
 | `微信 Token` | 微信消息推送配置 | 必须和微信开发者平台里填的一致。 |
 | `微信 AppID` | 公众号详情页 | 复制 AppID。 |
 | `微信 AppSecret` | 开发密钥区域 | 复制或重置 AppSecret。 |
+| `账号校验 URL` | SaaS 后端 | 可选。收到公众号消息后，本服务先问 SaaS 是否允许绑定该账号。 |
+| `结果通知 URL` | SaaS 后端 | 可选。绑定成功或失败后，本服务主动通知 SaaS。 |
+| `回调签名密钥` | 自定义 | 可选。用于 SaaS 校验本服务发出的回调签名。 |
 
 保存后，控制台会长期写入 `WVB_CONFIG_PATH` 指向的 JSON 文件。
 
@@ -133,7 +136,9 @@ curl -sS -X POST http://127.0.0.1:3000/v1/tenants/acme-wechat/pending-bind-inten
 请关注我们的公众号，并向公众号发送你的平台账号：user_123
 ```
 
-绑定成功后，SaaS 后端查询：
+如果配置了 `账号校验 URL`，本服务会先调用 SaaS 后端确认该账号是否有效。返回 `{"allowed": true}` 后才会写入绑定。
+
+绑定成功后，SaaS 后端可以等待 `结果通知 URL` 的主动通知，也可以继续查询：
 
 ```bash
 curl -sS http://127.0.0.1:3000/v1/tenants/acme-wechat/bindings/user_123 \

@@ -8,109 +8,133 @@
   </head>
   <body>
     <header class="topbar">
-      <div>
-        <h1>SaaS Verify WeChat Console</h1>
-        <p>配置公众号接入，查看平台账号的微信验证状态。</p>
+      <div class="brand-block">
+        <span class="product-mark">WV</span>
+        <div>
+          <h1>微信验证控制台</h1>
+          <p>把公众号接入 SaaS，用微信 OpenID 锁定免费额度领取资格。</p>
+        </div>
       </div>
-      <div class="token-box">
+      <div class="token-box" aria-label="管理员令牌">
         <label for="adminToken">Admin Token</label>
         <input id="adminToken" type="password" autocomplete="current-password" placeholder="WVB_ADMIN_TOKEN">
-        <button id="saveTokenButton" type="button">保存到本机浏览器</button>
+        <button id="saveTokenButton" type="button">保存</button>
       </div>
     </header>
 
-    <main class="layout">
-      <section class="panel config-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>公众号配置</h2>
-            <p>长期保存到服务端配置文件。</p>
-          </div>
-          <button id="refreshButton" type="button">刷新</button>
+    <main class="console-shell">
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">推荐操作顺序</p>
+          <h2>三步完成公众号验证接入</h2>
         </div>
-
-        <form id="tenantForm" class="form-grid">
-          <label>
-            Tenant ID
-            <input id="tenantId" name="tenantId" required placeholder="demo-tenant">
-          </label>
-          <label>
-            Host Client ID
-            <input id="clientId" name="clientId" required placeholder="demo-client">
-          </label>
-          <label>
-            Host Client Secret
-            <input id="clientSecret" name="clientSecret" required placeholder="仅服务端使用">
-          </label>
-          <label>
-            微信 Token
-            <input id="wechatToken" name="wechatToken" required placeholder="公众号服务器配置 Token">
-          </label>
-          <label>
-            微信 AppID
-            <input id="wechatAppId" name="wechatAppId" required placeholder="wx...">
-          </label>
-          <label>
-            微信 AppSecret
-            <input id="wechatAppSecret" name="wechatAppSecret" required placeholder="公众号开发者密码">
-          </label>
-          <button class="primary span-2" type="submit">保存配置</button>
-        </form>
-
-        <div class="tenant-list">
-          <h3>已配置租户</h3>
-          <div id="tenantList" class="table-like"></div>
-        </div>
+        <ol class="step-strip" aria-label="接入步骤">
+          <li><span>1</span>保存公众号配置</li>
+          <li><span>2</span>复制 Webhook 到微信</li>
+          <li><span>3</span>查询用户验证结果</li>
+        </ol>
       </section>
 
-      <section class="panel guide-panel">
-        <h2>接入教程</h2>
-        <p>
-          新版公众号配置已迁移到微信开发者平台。先按独立教程拿到 AppID、AppSecret、
-          API IP 白名单和消息推送配置，再回到这里保存。
-        </p>
-        <a class="doc-link-card" href="/console/wechat-setup.html" target="_blank" rel="noreferrer">
-          <img src="/console/wechat-onboarding-flow.png" alt="微信公众号接入流程图">
-          打开图文接入教程
-          <span>包含新版入口、红框示意、Token 规则和本项目回填流程。</span>
-        </a>
-        <div class="webhook-preview">
-          <strong>当前租户 Webhook URL</strong>
-          <code id="webhookUrl">/wechat/{tenantId}/webhook</code>
-        </div>
-        <div class="copy-row">
-          <input id="publicBaseUrl" placeholder="https://your-domain.com" value="">
-          <button id="copyWebhookButton" type="button">复制完整 Webhook URL</button>
-        </div>
+      <section class="workspace">
+        <section class="panel config-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="step-label">步骤 1</p>
+              <h2>保存公众号配置</h2>
+              <p>这些信息来自微信开发者平台和你的 SaaS 后端。</p>
+            </div>
+            <button id="refreshButton" type="button">刷新租户</button>
+          </div>
+
+          <form id="tenantForm" class="form-grid">
+            <label>
+              Tenant ID
+              <input id="tenantId" name="tenantId" required placeholder="acme-wechat">
+            </label>
+            <label>
+              微信 AppID
+              <input id="wechatAppId" name="wechatAppId" required placeholder="wx...">
+            </label>
+            <label>
+              微信 Token
+              <input id="wechatToken" name="wechatToken" required placeholder="消息推送 Token">
+            </label>
+            <label>
+              微信 AppSecret
+              <input id="wechatAppSecret" name="wechatAppSecret" required placeholder="公众号开发者密码">
+            </label>
+            <label>
+              Host Client ID
+              <input id="clientId" name="clientId" required placeholder="SaaS 后端调用凭据">
+            </label>
+            <label>
+              Host Client Secret
+              <input id="clientSecret" name="clientSecret" required placeholder="仅服务端保存">
+            </label>
+            <label>
+              账号校验 URL
+              <input id="accountVerifyUrl" name="accountVerifyUrl" placeholder="https://your-saas.com/api/wechat/verify-account">
+            </label>
+            <label>
+              结果通知 URL
+              <input id="verificationWebhookUrl" name="verificationWebhookUrl" placeholder="https://your-saas.com/api/wechat/result">
+            </label>
+            <label class="span-2">
+              回调签名密钥
+              <input id="webhookSecret" name="webhookSecret" placeholder="用于签名账号校验和结果通知，可留空">
+            </label>
+            <button class="primary span-2" type="submit">保存配置</button>
+          </form>
+
+          <details class="quiet-section">
+            <summary>查看或编辑已保存租户</summary>
+            <div id="tenantList" class="table-like"></div>
+          </details>
+        </section>
+
+        <aside class="side-stack">
+          <section class="panel guide-panel">
+            <p class="step-label">步骤 2</p>
+            <h2>复制到微信</h2>
+            <p>在微信「消息推送」里填写这个 URL，并保持 Token 一致。</p>
+            <div class="webhook-preview">
+              <span>当前 Webhook URL</span>
+              <code id="webhookUrl">/wechat/{tenantId}/webhook</code>
+            </div>
+            <div class="copy-row">
+              <input id="publicBaseUrl" placeholder="https://your-domain.com" value="">
+              <button id="copyWebhookButton" type="button">复制 URL</button>
+            </div>
+            <a class="doc-link-card" href="/console/wechat-setup.html" target="_blank" rel="noreferrer">
+              <img src="/console/wechat-onboarding-flow.png" alt="微信公众号接入流程图">
+              <span>
+                <strong>打开图文教程</strong>
+                新版入口、Token 规则和回填流程
+              </span>
+            </a>
+          </section>
+
+          <section class="panel status-panel">
+            <p class="step-label">步骤 3</p>
+            <h2>查询验证结果</h2>
+            <form id="statusForm" class="query-row">
+              <input id="queryTenantId" required placeholder="tenantId">
+              <input id="queryPlatformAccountId" placeholder="平台账号，可留空">
+              <button class="primary" type="submit">查询</button>
+            </form>
+            <div id="bindingResults" class="table-like compact-results"></div>
+          </section>
+        </aside>
       </section>
 
-      <section class="panel status-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>用户验证状态</h2>
-            <p>按租户和平台账号查询已绑定状态。</p>
-          </div>
-        </div>
-
-        <form id="statusForm" class="query-row">
-          <input id="queryTenantId" required placeholder="tenantId">
-          <input id="queryPlatformAccountId" placeholder="平台账号，可留空查看最近绑定">
-          <button class="primary" type="submit">查询</button>
-        </form>
-
-        <div id="bindingResults" class="table-like"></div>
-      </section>
-
-      <section class="panel attempts-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>最近验证记录</h2>
-            <p>排查发错账号、过期会话和绑定冲突。</p>
-          </div>
+      <details class="panel attempts-panel quiet-section">
+        <summary>
+          <span>最近验证记录</span>
           <button id="refreshAttemptsButton" type="button">刷新记录</button>
-        </div>
+        </summary>
+        <p>用于排查发错账号、过期会话和绑定冲突。正常接入时不需要一直盯着这里。</p>
         <div id="attemptResults" class="table-like"></div>
-      </section>
+      </details>
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

@@ -5,7 +5,10 @@
       "clientSecret": "demo-secret",
       "wechatToken": "demowechattoken",
       "wechatAppId": "wx-your-official-account-appid",
-      "wechatAppSecret": "your-official-account-appsecret"
+      "wechatAppSecret": "your-official-account-appsecret",
+      "accountVerifyUrl": "https://your-saas.example.com/api/wechat/verify-account",
+      "verificationWebhookUrl": "https://your-saas.example.com/api/wechat/result",
+      "webhookSecret": "shared-callback-signing-secret"
     }
   }
 }
