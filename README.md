@@ -57,9 +57,9 @@ http://127.0.0.1:3000/console
 
 控制台可以：
 
-- 新增或更新租户配置，并长期保存到 `WVB_CONFIG_PATH` 指向的 JSON 文件。
+- 新增或更新接入配置，并长期保存到 `WVB_CONFIG_PATH` 指向的 JSON 文件。
 - 跳转到独立图文教程页 `/console/wechat-setup.html`，按新版微信开发者平台流程完成接入。
-- 查看当前租户的 Webhook URL。
+- 查看当前接入的 Webhook URL。
 - 查询某个 `tenantId + platformAccountId` 的微信验证状态。
 - 查看最近验证尝试，排查过期会话、发错账号和绑定冲突。
 
@@ -86,12 +86,12 @@ http://127.0.0.1:3000/console
 
 字段含义：
 
-- `clientId` / `clientSecret`：SaaS 后端调用本服务 API 的租户鉴权凭证。
+- `clientId` / `clientSecret`：控制台里显示为「SaaS API Key / Secret」，供 SaaS 后端调用本服务 API。
 - `wechatToken`：微信开发者平台「消息推送」配置中的 `Token`，建议使用微信侧随机生成值，不要包含短横线。
 - `wechatAppId` / `wechatAppSecret`：微信公众号开发者凭据，用于获取 `access_token`、查询关注状态、拉关注者 OpenID 列表。
-- `accountVerifyUrl`：可选。用户在公众号发送账号后，本服务先调用 SaaS 确认该账号是否允许绑定。
-- `verificationWebhookUrl`：可选。绑定成功或失败后，本服务主动通知 SaaS 最终结果。
-- `webhookSecret`：可选。用于给上述两个 SaaS 回调添加 `x-wvb-signature` HMAC 签名。
+- `accountVerifyUrl`：控制台里显示为「绑定前确认接口」。用户在公众号发送账号后，本服务先调用 SaaS 确认该账号是否允许绑定。
+- `verificationWebhookUrl`：控制台里显示为「绑定结果接收接口」。绑定成功或失败后，本服务主动通知 SaaS 最终结果。
+- `webhookSecret`：控制台里显示为「回调签名密钥」。用于给上述两个 SaaS 回调添加 `x-wvb-signature` HMAC 签名。
 
 ## 主要接口
 

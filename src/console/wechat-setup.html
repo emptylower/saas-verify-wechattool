@@ -13,7 +13,7 @@
       <h1>微信公众号接入教程</h1>
       <p>
         从微信开发者平台拿到 AppID、AppSecret、API 白名单和消息推送配置，
-        再回到本项目控制台保存租户配置。关键信息示例均已打码。
+        再回到本项目控制台保存接入配置。关键信息示例均已打码。
       </p>
     </header>
 
@@ -120,7 +120,7 @@
 
         <section id="plugin-console" class="panel doc-section">
           <h2>4. 回填本项目控制台</h2>
-          <p>微信侧配置完成后，回到本项目 <a href="/console">Web 控制台</a> 保存租户配置。</p>
+          <p>微信侧配置完成后，回到本项目 <a href="/console">Web 控制台</a> 保存接入配置。</p>
           <table class="doc-table">
             <thead>
               <tr>
@@ -131,14 +131,14 @@
             </thead>
             <tbody>
               <tr>
-                <td>Tenant ID</td>
+                <td>接入标识</td>
                 <td>你自己定义</td>
-                <td>会出现在 webhook URL 中，例如 <code>acme-wechat</code>。</td>
+                <td>原 Tenant ID。给这条接入起一个稳定名字，例如 <code>acme-prod</code>，会出现在 webhook URL 中。</td>
               </tr>
               <tr>
-                <td>Host Client ID / Secret</td>
+                <td>SaaS API Key / Secret</td>
                 <td>你自己定义</td>
-                <td>SaaS 后端调用本服务 API 时使用，不能暴露给浏览器。</td>
+                <td>原 Host Client ID / Secret。SaaS 后端调用本服务 API 时使用，不能暴露给浏览器。</td>
               </tr>
               <tr>
                 <td>微信 Token</td>
@@ -151,12 +151,12 @@
                 <td>用于换取 access_token；如果公众号没有 user/info 权限，绑定仍可基于消息 OpenID 完成。</td>
               </tr>
               <tr>
-                <td>账号校验 URL</td>
+                <td>绑定前确认接口</td>
                 <td>SaaS 后端</td>
                 <td>收到公众号消息后，本服务先调用它确认该账号是否允许绑定。</td>
               </tr>
               <tr>
-                <td>结果通知 URL</td>
+                <td>绑定结果接收接口</td>
                 <td>SaaS 后端</td>
                 <td>绑定成功或失败后，本服务主动把结果通知给 SaaS。</td>
               </tr>
@@ -167,6 +167,10 @@
               </tr>
             </tbody>
           </table>
+          <p>
+            接下来需要在你自己的 SaaS 后端实现两个回调端点，本服务才能完成"账号校验 → 写绑定 → 通知结果"的闭环。
+            <a href="/console/saas-callback-setup.html">→ 看 SaaS 回调端接入指南（多语言示例）</a>
+          </p>
         </section>
 
         <section id="verify" class="panel doc-section">

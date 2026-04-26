@@ -40,48 +40,77 @@
           <div class="panel-heading">
             <div>
               <p class="step-label">步骤 1</p>
-              <h2>保存公众号配置</h2>
-              <p>这些信息来自微信开发者平台和你的 SaaS 后端。</p>
+              <h2>先把三个系统连起来</h2>
+              <p>这里只做一件事：告诉本服务“你是谁、微信是谁、你的 SaaS 接口在哪里”。</p>
             </div>
-            <button id="refreshButton" type="button">刷新租户</button>
+            <button id="refreshButton" type="button">刷新已保存配置</button>
           </div>
 
           <form id="tenantForm" class="form-grid">
-            <label>
-              Tenant ID
-              <input id="tenantId" name="tenantId" required placeholder="acme-wechat">
+            <div class="form-section span-2">
+              <strong>1. 这条接入叫什么？</strong>
+              <span>给这次接入起一个内部名字。它会出现在微信 Webhook URL 里，建议用英文小写。</span>
+            </div>
+            <label class="field-card span-2">
+              <span class="field-title">接入标识 <small>原 Tenant ID</small></span>
+              <input id="tenantId" name="tenantId" required placeholder="例如 acme-prod 或 mysite-wechat">
+              <span class="field-hint">如果你只有一个 SaaS 站点，就随便起一个稳定名字；以后不要频繁改。</span>
             </label>
-            <label>
-              微信 AppID
+
+            <div class="form-section span-2">
+              <strong>2. 微信公众号信息</strong>
+              <span>从微信开发者平台复制。AppID、Token、AppSecret 必须和微信侧配置一致。</span>
+            </div>
+            <label class="field-card">
+              <span class="field-title">微信 AppID</span>
               <input id="wechatAppId" name="wechatAppId" required placeholder="wx...">
+              <span class="field-hint">公众号详情页里的 AppID。</span>
             </label>
-            <label>
-              微信 Token
+            <label class="field-card">
+              <span class="field-title">微信 Token</span>
               <input id="wechatToken" name="wechatToken" required placeholder="消息推送 Token">
+              <span class="field-hint">微信「消息推送」里填写的 Token，建议用微信随机生成。</span>
             </label>
-            <label>
-              微信 AppSecret
+            <label class="field-card span-2">
+              <span class="field-title">微信 AppSecret</span>
               <input id="wechatAppSecret" name="wechatAppSecret" required placeholder="公众号开发者密码">
+              <span class="field-hint">用于查询关注状态；只保存在服务端配置里。</span>
             </label>
-            <label>
-              Host Client ID
-              <input id="clientId" name="clientId" required placeholder="SaaS 后端调用凭据">
+
+            <div class="form-section span-2">
+              <strong>3. 你的 SaaS 怎么和本服务通信？</strong>
+              <span>这两个值就是 API Key。你的 SaaS 后端调用本服务创建验证会话、查询绑定状态时使用。</span>
+            </div>
+            <label class="field-card">
+              <span class="field-title">SaaS API Key <small>原 Host Client ID</small></span>
+              <input id="clientId" name="clientId" required placeholder="例如 mysite-server">
+              <span class="field-hint">自己生成即可，用来识别是哪一个 SaaS 后端在调用。</span>
             </label>
-            <label>
-              Host Client Secret
-              <input id="clientSecret" name="clientSecret" required placeholder="仅服务端保存">
+            <label class="field-card">
+              <span class="field-title">SaaS API Secret <small>原 Host Client Secret</small></span>
+              <input id="clientSecret" name="clientSecret" required placeholder="一串足够长的随机密钥">
+              <span class="field-hint">只放在你的 SaaS 服务端，不能放到浏览器。</span>
             </label>
-            <label>
-              账号校验 URL
+
+            <div class="form-section span-2">
+              <strong>4. 让流程真正闭环</strong>
+              <span>用户在公众号发账号后，本服务先问你的 SaaS 能不能绑定；完成后再把结果通知你的 SaaS。</span>
+              <a href="/console/saas-callback-setup.html" target="_blank" rel="noreferrer">看 SaaS 回调端实现示例（Node.js / Python / Go / PHP） →</a>
+            </div>
+            <label class="field-card">
+              <span class="field-title">绑定前确认接口 <small>推荐</small></span>
               <input id="accountVerifyUrl" name="accountVerifyUrl" placeholder="https://your-saas.com/api/wechat/verify-account">
+              <span class="field-hint">本服务会 POST 用户发来的账号。你的 SaaS 返回 <code>{"allowed": true}</code> 才会绑定。</span>
             </label>
-            <label>
-              结果通知 URL
+            <label class="field-card">
+              <span class="field-title">绑定结果接收接口 <small>推荐</small></span>
               <input id="verificationWebhookUrl" name="verificationWebhookUrl" placeholder="https://your-saas.com/api/wechat/result">
+              <span class="field-hint">绑定成功/失败后，本服务主动通知这里；你的 SaaS 可据此发放额度。</span>
             </label>
-            <label class="span-2">
-              回调签名密钥
-              <input id="webhookSecret" name="webhookSecret" placeholder="用于签名账号校验和结果通知，可留空">
+            <label class="field-card span-2">
+              <span class="field-title">回调签名密钥 <small>可选但推荐</small></span>
+              <input id="webhookSecret" name="webhookSecret" placeholder="一串双方约定的随机密钥">
+              <span class="field-hint">用于证明“确认接口”和“结果通知”确实来自本服务，不是别人伪造。</span>
             </label>
             <button class="primary span-2" type="submit">保存配置</button>
           </form>
@@ -96,7 +125,7 @@
           <section class="panel guide-panel">
             <p class="step-label">步骤 2</p>
             <h2>复制到微信</h2>
-            <p>在微信「消息推送」里填写这个 URL，并保持 Token 一致。</p>
+            <p>把这个地址填到微信开发者平台的「消息推送 URL」。微信会把关注和用户消息发到这里。</p>
             <div class="webhook-preview">
               <span>当前 Webhook URL</span>
               <code id="webhookUrl">/wechat/{tenantId}/webhook</code>
@@ -116,10 +145,10 @@
 
           <section class="panel status-panel">
             <p class="step-label">步骤 3</p>
-            <h2>查询验证结果</h2>
+            <h2>查一个用户是否已验证</h2>
             <form id="statusForm" class="query-row">
-              <input id="queryTenantId" required placeholder="tenantId">
-              <input id="queryPlatformAccountId" placeholder="平台账号，可留空">
+              <input id="queryTenantId" required placeholder="接入标识，例如 acme-prod">
+              <input id="queryPlatformAccountId" placeholder="你 SaaS 里的用户 ID，可留空">
               <button class="primary" type="submit">查询</button>
             </form>
             <div id="bindingResults" class="table-like compact-results"></div>

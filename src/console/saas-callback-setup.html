@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SaaS 回调端接入指南</title>
+    <link rel="stylesheet" href="/console/styles.css">
+  </head>
+  <body class="doc-page">
+    <header class="doc-hero">
+      <a class="back-link" href="/console">← 返回控制台</a>
+      <p class="eyebrow">SaaS 回调端</p>
+      <h1>SaaS 回调端接入指南</h1>
+      <p>
+        用户绑定流程中，本服务会主动 POST 到你 SaaS 后端的两个 endpoint。
+        本文说明这两个 endpoint 的输入输出、回调签名校验机制、4 种语言的最小可跑实现，
+        以及不部署也能本地试的 curl 自测方法。
+      </p>
+    </header>
+
+    <main class="doc-layout">
+      <nav class="doc-toc panel">
+        <strong>本页内容</strong>
+        <a href="#what">1. 这两个 URL 是干什么的</a>
+        <a href="#sign">2. 回调签名校验</a>
+        <a href="#schema">3. 请求字段说明</a>
+        <a href="#examples">4. 多语言示例</a>
+        <a href="#smoke-test">5. 用 curl 自测</a>
+      </nav>
+
+      <article class="doc-content">
+        <section id="what" class="panel doc-section">
+          <h2>1. 这两个 URL 是干什么的</h2>
+          <p>
+            用户向你接入的微信公众号发送平台账号后，本服务会按下面顺序与你的 SaaS 后端通信：
+          </p>
+          <ol>
+            <li>本服务收到微信回调，解析出消息中的 <code>OpenID</code> 和用户发的"平台账号"。</li>
+            <li><strong>POST 到「绑定前确认 URL」</strong>，问你"这账号能绑吗"。等你返回 <code>{"allowed": true}</code> 才继续。</li>
+            <li>本服务写绑定（或按你拒绝的 reasonCode 拒绝）。</li>
+            <li><strong>POST 到「绑定结果通知 URL」</strong>，把最终结果（绑定成功 / 各种拒绝）告诉 SaaS。</li>
+            <li>SaaS 在第 4 步收到 <code>outcome: "bound"</code> 后真正发免费额度、标完成、推消息。</li>
+          </ol>
+          <div class="checklist">
+            <div>
+              <strong>绑定前确认 URL</strong>
+              <p>
+                本服务会<strong>等</strong>这个回调返回再决定是否写绑定。
+                返 5xx / 超时 / <code>{"allowed": false}</code> 都会让绑定被拒（避免 SaaS 故障时白发额度）。
+                这里是查你自己用户表的地方。
+              </p>
+            </div>
+            <div>
+              <strong>绑定结果通知 URL</strong>
+              <p>
+                本服务<strong>写完绑定（或决定拒绝）后</strong>再 POST 通知。
+                只看 HTTP 2xx，不解析 body，不重试。
+                这里是发额度 / 标完成的地方。
+              </p>
+            </div>
+            <div>
+              <strong>回调签名密钥</strong>
+              <p>
+                如果在控制台填了它，上面两个回调请求会带 HMAC-SHA256 签名 header；
+                没填则不带。建议生产环境一定要填，否则任何人能伪造回调。
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="sign" class="panel doc-section">
+          <h2>2. 回调签名校验</h2>
+          <p>
+            只有当你在控制台配置了 <code>回调签名密钥</code>（webhookSecret）时，
+            两个回调请求才会带下面三个 headers：
+          </p>
+          <table class="doc-table">
+            <thead>
+              <tr><th>Header</th><th>内容</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>x-wvb-event</code></td>
+                <td><code>account.verify</code> 或 <code>wechat.binding.result</code></td>
+              </tr>
+              <tr>
+                <td><code>x-wvb-timestamp</code></td>
+                <td>Unix 秒级时间戳，字符串形式</td>
+              </tr>
+              <tr>
+                <td><code>x-wvb-signature</code></td>
+                <td><code>sha256=&lt;hex hmac-sha256&gt;</code></td>
+              </tr>
+            </tbody>
+          </table>
+          <p><strong>签名算法：</strong></p>
+          <pre><code>signing_string = x-wvb-timestamp + "." + 原始请求 body 字节
+signature      = HMAC-SHA256(webhookSecret, signing_string)，hex 输出
+header         = "sha256=" + signature</code></pre>
+          <div class="warning-box">
+            <strong>三条容易踩的坑</strong>
+            <ol>
+              <li>用<strong>原始 body bytes</strong> 算签名，<em>不要</em>先 <code>JSON.parse</code> 再 <code>stringify</code> ——
+                字段顺序、空格不同就会算出不同的签名。</li>
+              <li>用<strong>常量时间比较</strong>（每种语言示例里都演示了）。
+                直接 <code>===</code> / <code>==</code> 会被时序攻击。</li>
+              <li><strong>校验时间戳</strong>，5 分钟之外的丢弃，防止被人重放抓到的回调。</li>
+            </ol>
+          </div>
+          <p class="muted">
+            参考实现：本服务这一侧的签名生成在
+            <a href="https://github.com/" rel="noreferrer"><code>src/lib/tenant_callbacks.js</code></a> 里，
+            两边公式必须一致。
+          </p>
+        </section>
+
+        <section id="schema" class="panel doc-section">
+          <h2>3. 请求字段说明</h2>
+
+          <h3><code>account.verify</code> 请求体</h3>
+          <table class="doc-table">
+            <thead>
+              <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>type</code></td><td>string</td><td>固定 <code>"account.verify"</code></td></tr>
+              <tr><td><code>tenant_id</code></td><td>string</td><td>你在控制台配置的租户 ID</td></tr>
+              <tr><td><code>platform_account_id</code></td><td>string</td><td>用户在公众号发送的文本，本服务原样转发——这是用户自己输入的，去你的用户表里查存在性，<strong>不要 trust</strong></td></tr>
+              <tr><td><code>wechat_open_id</code></td><td>string</td><td>该公众号下的 OpenID，对该公众号稳定唯一</td></tr>
+              <tr><td><code>wechat_official_account_appid</code></td><td>string &#124; null</td><td>公众号 AppID</td></tr>
+              <tr><td><code>wechat_subscribe_status</code></td><td>string</td><td><code>"subscribed"</code> / <code>"unsubscribed"</code> / <code>"unchecked"</code></td></tr>
+              <tr><td><code>message_id</code></td><td>string</td><td>微信消息 ID，可作幂等 key</td></tr>
+              <tr><td><code>received_at</code></td><td>string</td><td>本服务收到时间，ISO-8601</td></tr>
+            </tbody>
+          </table>
+
+          <h3><code>account.verify</code> 响应约定</h3>
+          <table class="doc-table">
+            <thead>
+              <tr><th>SaaS 返回</th><th>本服务行为</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>200</code> + <code>{"allowed": true}</code></td>
+                <td>继续走绑定</td>
+              </tr>
+              <tr>
+                <td><code>200</code> + <code>{"allowed": false, "reasonCode": "..."}</code></td>
+                <td>拒绝绑定，<code>reasonCode</code> 进审计 + 透传到结果通知</td>
+              </tr>
+              <tr>
+                <td>4xx / 5xx / 超时</td>
+                <td>视为"无法确认"，拒绝绑定，<code>reason_code = host_account_verification_unavailable</code>。这是<strong>故意的失败保险</strong>——SaaS 挂了不能白发额度</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3><code>wechat.binding.result</code> 请求体</h3>
+          <table class="doc-table">
+            <thead>
+              <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>type</code></td><td>string</td><td>固定 <code>"wechat.binding.result"</code></td></tr>
+              <tr><td><code>tenant_id</code></td><td>string</td><td>同上</td></tr>
+              <tr><td><code>platform_account_id</code></td><td>string</td><td>涉及的平台账号</td></tr>
+              <tr><td><code>outcome</code></td><td>string</td><td>详见下方 outcome 表</td></tr>
+              <tr><td><code>is_bound</code></td><td>boolean</td><td>终态是否绑定成功；<strong>发额度只看这个</strong></td></tr>
+              <tr><td><code>reason_code</code></td><td>string &#124; null</td><td>拒绝原因，bound / idempotent_success 时为 null</td></tr>
+              <tr><td><code>wechat_binding_ref</code></td><td>string &#124; null</td><td>本服务的绑定记录 ref，可存留备查</td></tr>
+              <tr><td><code>wechat_official_account_appid</code></td><td>string &#124; null</td><td></td></tr>
+              <tr><td><code>wechat_subscribe_status</code></td><td>string &#124; null</td><td></td></tr>
+              <tr><td><code>bound_at</code></td><td>string &#124; null</td><td>ISO-8601</td></tr>
+              <tr><td><code>message_id</code></td><td>string</td><td>微信消息 ID，可作幂等 key</td></tr>
+              <tr><td><code>occurred_at</code></td><td>string</td><td>本服务发出时间，ISO-8601</td></tr>
+            </tbody>
+          </table>
+
+          <h3><code>wechat.binding.result</code> 响应约定</h3>
+          <p>
+            本服务只看 HTTP <code>2xx</code>；body 不解析。
+            SaaS 端<strong>自己保证幂等</strong>——
+            同一个 <code>message_id</code> 或 <code>(tenant_id, platform_account_id)</code> 重复收到时只发一次额度。
+            本服务这次不实现回调重试。
+          </p>
+
+          <h3>outcome / reason_code 含义</h3>
+          <table class="doc-table">
+            <thead>
+              <tr><th>outcome</th><th>reason_code</th><th>含义</th><th>SaaS 应做什么</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>bound</code></td>
+                <td><code>null</code></td>
+                <td>第一次成功绑定</td>
+                <td>发额度</td>
+              </tr>
+              <tr>
+                <td><code>idempotent_success</code></td>
+                <td><code>null</code></td>
+                <td>同一对 (OpenID, account) 重复绑定</td>
+                <td>视为已绑；按你 message_id 去重决定是否再发额度</td>
+              </tr>
+              <tr>
+                <td><code>rejected_wechat_already_bound</code></td>
+                <td><code>wechat_already_bound</code></td>
+                <td>该 OpenID 已绑其他账号</td>
+                <td>提示用户该微信已用于其他账号</td>
+              </tr>
+              <tr>
+                <td><code>rejected_platform_account_already_bound</code></td>
+                <td><code>platform_account_already_bound</code></td>
+                <td>该平台账号已绑其他 OpenID</td>
+                <td>提示用户该账号已绑过微信</td>
+              </tr>
+              <tr>
+                <td><code>rejected_missing_or_expired_intent</code></td>
+                <td><code>missing_or_expired_pending_intent</code></td>
+                <td>该平台账号没有活跃的 pending intent</td>
+                <td>引导用户回到任务页重新发起验证</td>
+              </tr>
+              <tr>
+                <td><code>rejected_host_account_verification</code></td>
+                <td>(SaaS 自己返的) 或 <code>account_not_allowed</code></td>
+                <td>SaaS 在 verify 阶段说不允许</td>
+                <td>按你自己返的 reasonCode 处理</td>
+              </tr>
+              <tr>
+                <td><code>rejected_host_account_verification</code></td>
+                <td><code>host_account_verification_unavailable</code></td>
+                <td>SaaS 的 verify 接口挂了或超时</td>
+                <td>修 SaaS 端，让用户重发消息</td>
+              </tr>
+              <tr>
+                <td><code>rejected_malformed</code></td>
+                <td>一般为 <code>missing_platform_account_id</code></td>
+                <td>用户发了空消息或非法消息</td>
+                <td>一般无需处理，本服务已自动回复用户</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="examples" class="panel doc-section">
+          <h2>4. 多语言示例</h2>
+          <p>
+            每段示例都做了同一件事：
+            校验签名 → 解析 body → 标注"在这里查你自己的用户表"和"在这里发额度"两个扩展点 → 返回响应。
+            复制出去补上业务逻辑就能用。所有示例都假设环境变量 <code>WVB_WEBHOOK_SECRET</code> 是控制台填的回调签名密钥；
+            没设置则跳过签名校验（仅本地试用）。
+          </p>
+          <div class="code-tabs" role="tablist" aria-label="语言切换">
+            <button type="button" role="tab" aria-selected="true" data-target="pane-node">Node.js (Express)</button>
+            <button type="button" role="tab" aria-selected="false" data-target="pane-py">Python (FastAPI)</button>
+            <button type="button" role="tab" aria-selected="false" data-target="pane-go">Go (net/http)</button>
+            <button type="button" role="tab" aria-selected="false" data-target="pane-php">PHP</button>
+          </div>
+
+          <section id="pane-node" class="code-pane" role="tabpanel">
+<pre><code>import express from 'express';
+import crypto from 'node:crypto';
+
+const app = express();
+const SECRET = process.env.WVB_WEBHOOK_SECRET ?? '';
+
+// 用 verify 拿到原始 body 字节，不要先 JSON.parse 再 stringify
+app.use(express.json({
+  verify: (req, _res, buf) =&gt; { req.rawBody = buf.toString('utf8'); }
+}));
+
+function verifySignature(req) {
+  if (!SECRET) return true; // 没配密钥时跳过校验
+
+  const ts = req.header('x-wvb-timestamp') ?? '';
+  const sigHeader = req.header('x-wvb-signature') ?? '';
+  const sig = sigHeader.startsWith('sha256=') ? sigHeader.slice(7) : sigHeader;
+
+  // 5 分钟防回放
+  if (Math.abs(Date.now() / 1000 - Number(ts)) &gt; 300) return false;
+
+  const expected = crypto
+    .createHmac('sha256', SECRET)
+    .update(`${ts}.${req.rawBody ?? ''}`)
+    .digest('hex');
+
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(sig, 'hex'),
+      Buffer.from(expected, 'hex')
+    );
+  } catch {
+    return false;
+  }
+}
+
+app.post('/api/wechat/verify-account', (req, res) =&gt; {
+  if (!verifySignature(req)) return res.status(401).json({ error: 'bad_signature' });
+
+  const { platform_account_id } = req.body;
+  // ← 在这里查你自己的用户表，决定是否允许该账号绑定
+  const allowed = Boolean(platform_account_id);
+
+  res.json(allowed
+    ? { allowed: true }
+    : { allowed: false, reasonCode: 'account_not_allowed' });
+});
+
+app.post('/api/wechat/result', (req, res) =&gt; {
+  if (!verifySignature(req)) return res.status(401).json({ error: 'bad_signature' });
+
+  const { outcome, platform_account_id, message_id } = req.body;
+  // ← 用 message_id 做幂等：同一个 id 已处理过就跳过
+  if (outcome === 'bound') {
+    // ← 在这里发免费额度 / 标记完成 / 通知用户
+  }
+
+  res.status(200).end();
+});
+
+app.listen(8080);</code></pre>
+          </section>
+
+          <section id="pane-py" class="code-pane" role="tabpanel" hidden>
+<pre><code>import hashlib
+import hmac
+import json
+import os
+import time
+
+from fastapi import FastAPI, HTTPException, Request
+
+app = FastAPI()
+SECRET = os.environ.get("WVB_WEBHOOK_SECRET", "")
+
+
+async def read_verified_body(request: Request) -&gt; dict:
+    # 用原始 body 字节算签名，不要先 json.loads 再 dumps
+    raw = await request.body()
+
+    if SECRET:
+        ts = request.headers.get("x-wvb-timestamp", "")
+        sig_header = request.headers.get("x-wvb-signature", "")
+        sig = sig_header[7:] if sig_header.startswith("sha256=") else sig_header
+
+        try:
+            ts_int = int(ts)
+        except ValueError:
+            raise HTTPException(401, "bad_timestamp")
+
+        # 5 分钟防回放
+        if abs(time.time() - ts_int) &gt; 300:
+            raise HTTPException(401, "stale_timestamp")
+
+        expected = hmac.new(
+            SECRET.encode(),
+            f"{ts}.{raw.decode()}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(sig, expected):
+            raise HTTPException(401, "bad_signature")
+
+    return json.loads(raw or b"{}")
+
+
+@app.post("/api/wechat/verify-account")
+async def verify_account(request: Request):
+    body = await read_verified_body(request)
+
+    # ← 在这里查你自己的用户表，决定是否允许该账号绑定
+    if not body.get("platform_account_id"):
+        return {"allowed": False, "reasonCode": "account_not_allowed"}
+    return {"allowed": True}
+
+
+@app.post("/api/wechat/result")
+async def result(request: Request):
+    body = await read_verified_body(request)
+
+    # ← 用 message_id 做幂等；outcome == "bound" 时发额度
+    if body.get("outcome") == "bound":
+        pass  # ← 在这里发免费额度
+    return {"ok": True}</code></pre>
+          </section>
+
+          <section id="pane-go" class="code-pane" role="tabpanel" hidden>
+<pre><code>package main
+
+import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+var secret = os.Getenv("WVB_WEBHOOK_SECRET")
+
+// 读 body 并做签名校验。返回原始 bytes 与是否通过。
+func verifyAndRead(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "read_failed", http.StatusBadRequest)
+		return nil, false
+	}
+
+	if secret == "" {
+		return raw, true // 没配密钥时跳过校验
+	}
+
+	ts := r.Header.Get("x-wvb-timestamp")
+	sig := strings.TrimPrefix(r.Header.Get("x-wvb-signature"), "sha256=")
+
+	tsInt, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil || abs(time.Now().Unix()-tsInt) &gt; 300 {
+		http.Error(w, "stale_or_bad_timestamp", http.StatusUnauthorized)
+		return nil, false
+	}
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(ts + "."))
+	mac.Write(raw)
+	expected := hex.EncodeToString(mac.Sum(nil))
+
+	if subtle.ConstantTimeCompare([]byte(sig), []byte(expected)) != 1 {
+		http.Error(w, "bad_signature", http.StatusUnauthorized)
+		return nil, false
+	}
+	return raw, true
+}
+
+func abs(n int64) int64 {
+	if n &lt; 0 {
+		return -n
+	}
+	return n
+}
+
+func handleVerifyAccount(w http.ResponseWriter, r *http.Request) {
+	raw, ok := verifyAndRead(w, r)
+	if !ok {
+		return
+	}
+
+	var body map[string]any
+	json.NewDecoder(bytes.NewReader(raw)).Decode(&amp;body)
+	w.Header().Set("content-type", "application/json")
+
+	// ← 在这里查你自己的用户表，决定是否允许该账号绑定
+	if id, ok := body["platform_account_id"].(string); !ok || id == "" {
+		json.NewEncoder(w).Encode(map[string]any{
+			"allowed":    false,
+			"reasonCode": "account_not_allowed",
+		})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]any{"allowed": true})
+}
+
+func handleResult(w http.ResponseWriter, r *http.Request) {
+	raw, ok := verifyAndRead(w, r)
+	if !ok {
+		return
+	}
+
+	var body map[string]any
+	json.NewDecoder(bytes.NewReader(raw)).Decode(&amp;body)
+
+	// ← 用 message_id 做幂等；outcome == "bound" 时发额度
+	if body["outcome"] == "bound" {
+		// ← 在这里发免费额度
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func main() {
+	http.HandleFunc("/api/wechat/verify-account", handleVerifyAccount)
+	http.HandleFunc("/api/wechat/result", handleResult)
+	http.ListenAndServe(":8080", nil)
+}</code></pre>
+          </section>
+
+          <section id="pane-php" class="code-pane" role="tabpanel" hidden>
+<pre><code>&lt;?php
+
+// 用原始 body 字节算签名，不要 json_decode 后再 encode
+$raw = file_get_contents('php://input') ?: '';
+$secret = getenv('WVB_WEBHOOK_SECRET') ?: '';
+
+function verifySignature(string $secret, string $raw): bool {
+    if ($secret === '') {
+        return true; // 没配密钥时跳过校验
+    }
+
+    $ts = $_SERVER['HTTP_X_WVB_TIMESTAMP'] ?? '';
+    $sigHeader = $_SERVER['HTTP_X_WVB_SIGNATURE'] ?? '';
+    $sig = (substr($sigHeader, 0, 7) === 'sha256=')
+        ? substr($sigHeader, 7)
+        : $sigHeader;
+
+    // 5 分钟防回放
+    if (!ctype_digit($ts) || abs(time() - (int)$ts) &gt; 300) {
+        return false;
+    }
+
+    $expected = hash_hmac('sha256', "$ts.$raw", $secret);
+    return hash_equals($expected, $sig); // 常量时间比较
+}
+
+if (!verifySignature($secret, $raw)) {
+    http_response_code(401);
+    header('Content-Type: application/json');
+    echo json_encode(['error' =&gt; 'bad_signature']);
+    exit;
+}
+
+$body = json_decode($raw, true) ?: [];
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+header('Content-Type: application/json');
+
+if ($path === '/api/wechat/verify-account') {
+    // ← 在这里查你自己的用户表，决定是否允许该账号绑定
+    if (empty($body['platform_account_id'])) {
+        echo json_encode(['allowed' =&gt; false, 'reasonCode' =&gt; 'account_not_allowed']);
+    } else {
+        echo json_encode(['allowed' =&gt; true]);
+    }
+    exit;
+}
+
+if ($path === '/api/wechat/result') {
+    // ← 用 message_id 做幂等；outcome === "bound" 时发额度
+    if (($body['outcome'] ?? '') === 'bound') {
+        // ← 在这里发免费额度
+    }
+    http_response_code(200);
+    exit;
+}
+
+http_response_code(404);</code></pre>
+          </section>
+        </section>
+
+        <section id="smoke-test" class="panel doc-section">
+          <h2>5. 用 curl 自测</h2>
+          <p>
+            SaaS 端写完后，不用等微信真的把消息推过来——
+            本地用 <code>curl</code> 自己模拟一次本服务的回调请求，能立刻看出签名校验、字段解析、业务分支是否对。
+          </p>
+
+          <h3>模拟 <code>account.verify</code></h3>
+<pre><code>SECRET="your-shared-secret"
+TS=$(date +%s)
+BODY='{"type":"account.verify","tenant_id":"demo-tenant","platform_account_id":"user_123","wechat_open_id":"o_xxx","wechat_official_account_appid":"wx...","wechat_subscribe_status":"subscribed","message_id":"1001","received_at":"2026-04-25T00:00:00.000Z"}'
+
+SIG=$(printf '%s' "${TS}.${BODY}" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+
+curl -X POST http://localhost:8080/api/wechat/verify-account \
+  -H 'content-type: application/json' \
+  -H "x-wvb-event: account.verify" \
+  -H "x-wvb-timestamp: $TS" \
+  -H "x-wvb-signature: sha256=$SIG" \
+  --data-raw "$BODY"</code></pre>
+
+          <h3>模拟 <code>wechat.binding.result</code>（成功绑定）</h3>
+<pre><code>SECRET="your-shared-secret"
+TS=$(date +%s)
+BODY='{"type":"wechat.binding.result","tenant_id":"demo-tenant","platform_account_id":"user_123","outcome":"bound","is_bound":true,"reason_code":null,"wechat_binding_ref":"9f4c7a1b2d3e8f00","wechat_official_account_appid":"wx...","wechat_subscribe_status":"subscribed","bound_at":"2026-04-25T00:00:00.000Z","message_id":"1001","occurred_at":"2026-04-25T00:00:00.000Z"}'
+
+SIG=$(printf '%s' "${TS}.${BODY}" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+
+curl -X POST http://localhost:8080/api/wechat/result \
+  -H 'content-type: application/json' \
+  -H "x-wvb-event: wechat.binding.result" \
+  -H "x-wvb-timestamp: $TS" \
+  -H "x-wvb-signature: sha256=$SIG" \
+  --data-raw "$BODY"</code></pre>
+
+          <div class="success-box">
+            <strong>SaaS 端读到的签名校验不通过？</strong>
+            <p>
+              99% 是没用<strong>原始 body 字节</strong>算签名（先 parse 再 stringify 会破坏空格/字段顺序）；
+              少数情况是把 timestamp 当成数字传了——header 里始终是字符串。
+            </p>
+          </div>
+        </section>
+      </article>
+    </main>
+
+    <script>
+      const tabs = document.querySelectorAll('.code-tabs button[role="tab"]');
+      const panes = document.querySelectorAll('.code-pane');
+
+      function activate(target) {
+        for (const tab of tabs) {
+          tab.setAttribute('aria-selected', tab.dataset.target === target ? 'true' : 'false');
+        }
+        for (const pane of panes) {
+          pane.hidden = pane.id !== target;
+        }
+      }
+
+      for (const tab of tabs) {
+        tab.addEventListener('click', () => activate(tab.dataset.target));
+      }
+    </script>
+  </body>
+</html>

@@ -49,7 +49,7 @@ POST /v1/tenants/{tenantId}/pending-bind-intents
 - 用户需要发送的平台账号。
 - 验证状态刷新按钮或轮询。
 
-如果已经配置 `verificationWebhookUrl`，前端可以等待业务后端收到主动通知后刷新状态；没有配置时，再每 2 到 5 秒查询一次业务后端。不要让浏览器直接拿本服务的 `clientSecret`。
+如果已经配置「绑定结果接收接口」，前端可以等待业务后端收到主动通知后刷新状态；没有配置时，再每 2 到 5 秒查询一次业务后端。不要让浏览器直接拿本服务的 `clientSecret`。
 
 ### 3. 用户发送平台账号到公众号
 
@@ -65,7 +65,7 @@ POST /v1/tenants/{tenantId}/pending-bind-intents
 
 ### 4. SaaS 后端校验账号
 
-如果租户配置了 `accountVerifyUrl`，本服务会发送：
+如果配置了「绑定前确认接口」（底层字段 `accountVerifyUrl`），本服务会发送：
 
 ```http
 POST https://your-saas.com/api/wechat/verify-account
@@ -107,7 +107,7 @@ SaaS 应返回：
 
 ### 5. SaaS 后端接收绑定结果
 
-如果租户配置了 `verificationWebhookUrl`，本服务会发送：
+如果配置了「绑定结果接收接口」（底层字段 `verificationWebhookUrl`），本服务会发送：
 
 ```http
 POST https://your-saas.com/api/wechat/result
@@ -168,7 +168,7 @@ GET /v1/tenants/{tenantId}/bindings/{platformAccountId}
 
 ## 回调签名
 
-如果配置了 `webhookSecret`，本服务会在 `accountVerifyUrl` 和 `verificationWebhookUrl` 请求中附带：
+如果配置了「回调签名密钥」（底层字段 `webhookSecret`），本服务会在「绑定前确认接口」和「绑定结果接收接口」请求中附带：
 
 ```text
 x-wvb-event: account.verify 或 wechat.binding.result

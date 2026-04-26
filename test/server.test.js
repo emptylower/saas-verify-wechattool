@@ -298,19 +298,32 @@ test('serves embedded console assets with admin workflow entrypoint', async () =
     const guideResponse = await fetch(`${app.baseUrl}/console/wechat-setup.html`);
     const guideBody = await guideResponse.text();
     const flowImageResponse = await fetch(`${app.baseUrl}/console/wechat-onboarding-flow.png`);
+    const callbackGuideResponse = await fetch(`${app.baseUrl}/console/saas-callback-setup.html`);
+    const callbackGuideBody = await callbackGuideResponse.text();
+    const callbackGuideAliasResponse = await fetch(`${app.baseUrl}/console/saas-callback-setup`);
 
     assert.equal(consoleResponse.status, 200);
     assert.match(consoleBody, /SaaS Verify WeChat Console/);
     assert.match(consoleBody, /wechat-setup\.html/);
     assert.match(consoleBody, /wechat-onboarding-flow\.png/);
+    assert.match(consoleBody, /saas-callback-setup\.html/);
     assert.equal(scriptResponse.status, 200);
     assert.match(await scriptResponse.text(), /v1\/admin\/tenants/);
     assert.equal(guideResponse.status, 200);
     assert.match(guideBody, /新版微信开发者平台流程/);
     assert.match(guideBody, /消息推送/);
+    assert.match(guideBody, /saas-callback-setup\.html/);
     assert.doesNotMatch(guideBody, /u-sync-hero\.svg/);
     assert.equal(flowImageResponse.status, 200);
     assert.equal(flowImageResponse.headers['content-type'], 'image/png');
+    assert.equal(callbackGuideResponse.status, 200);
+    assert.match(callbackGuideBody, /SaaS 回调端接入指南/);
+    assert.match(callbackGuideBody, /回调签名校验/);
+    assert.match(callbackGuideBody, /pane-node/);
+    assert.match(callbackGuideBody, /pane-py/);
+    assert.match(callbackGuideBody, /pane-go/);
+    assert.match(callbackGuideBody, /pane-php/);
+    assert.equal(callbackGuideAliasResponse.status, 200);
   } finally {
     await app.close();
   }

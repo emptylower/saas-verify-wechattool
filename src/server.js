@@ -34,6 +34,13 @@ function matchRoute(method, pathname) {
     return { name: 'consoleWeChatSetup', params: {} };
   }
 
+  if (
+    method === 'GET' &&
+    (pathname === '/console/saas-callback-setup' || pathname === '/console/saas-callback-setup.html')
+  ) {
+    return { name: 'consoleSaasCallbackSetup', params: {} };
+  }
+
   if (method === 'GET' && pathname === '/console/styles.css') {
     return { name: 'consoleStyles', params: {} };
   }
@@ -234,6 +241,12 @@ export async function createApp({
 
       if (match.name === 'consoleWeChatSetup') {
         const html = await readFile(path.join(consoleDirectory, 'wechat-setup.html'), 'utf8');
+        sendHtml(response, 200, html);
+        return;
+      }
+
+      if (match.name === 'consoleSaasCallbackSetup') {
+        const html = await readFile(path.join(consoleDirectory, 'saas-callback-setup.html'), 'utf8');
         sendHtml(response, 200, html);
         return;
       }

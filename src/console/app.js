@@ -92,16 +92,16 @@ function renderTenants() {
   }
 
   const rows = [
-    '<div class="row header"><span>Tenant</span><span>微信 AppID</span><span>凭据</span><span>操作</span></div>'
+    '<div class="row header"><span>接入标识</span><span>微信 AppID</span><span>接入状态</span><span>操作</span></div>'
   ];
 
   for (const tenant of state.tenants) {
     const credentialText = [
-      tenant.has_client_secret ? 'Host OK' : 'Host 缺失',
-      tenant.has_wechat_token ? 'Token OK' : 'Token 缺失',
-      tenant.has_wechat_appsecret ? 'AppSecret OK' : 'AppSecret 缺失',
-      tenant.account_verify_url ? '校验 OK' : '未接校验',
-      tenant.verification_webhook_url ? '通知 OK' : '未接通知'
+      tenant.has_client_secret ? 'SaaS 凭据已填' : '缺 SaaS Secret',
+      tenant.has_wechat_token ? '微信 Token 已填' : '缺微信 Token',
+      tenant.has_wechat_appsecret ? 'AppSecret 已填' : '缺 AppSecret',
+      tenant.account_verify_url ? '绑定前确认已接' : '未接绑定前确认',
+      tenant.verification_webhook_url ? '结果通知已接' : '未接结果通知'
     ].join(' · ');
 
     rows.push(`<div class="row">
@@ -156,7 +156,7 @@ async function saveTenant(event) {
   const tenantId = elements.tenantId.value.trim();
 
   if (!tenantId) {
-    showToast('请先填写 Tenant ID');
+    showToast('请先填写接入标识');
     return;
   }
 

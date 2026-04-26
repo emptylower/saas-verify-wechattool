@@ -9,7 +9,7 @@
 接入要配置两边：
 
 1. **微信开发者平台**：拿到 `AppID`、`AppSecret`，配置 API IP 白名单，启用消息推送。
-2. **本项目控制台**：保存 `Tenant ID`、Host API 凭据、微信 `Token`、`AppID`、`AppSecret`。
+2. **本项目控制台**：保存接入标识、SaaS API 凭据、微信 `Token`、`AppID`、`AppSecret`，以及闭环回调接口。
 
 消息推送 URL 的格式固定是：
 
@@ -17,7 +17,7 @@
 https://your-domain.com/wechat/{tenantId}/webhook
 ```
 
-其中 `{tenantId}` 必须和本项目控制台里的 `Tenant ID` 完全一致。
+其中 `{tenantId}` 就是控制台里的「接入标识」。它只是这条接入的内部名字，例如 `acme-prod`。
 
 ## 1. 进入新版公众号开发者后台
 
@@ -102,14 +102,14 @@ http://127.0.0.1:3000/console
 
 | 控制台字段 | 来源 | 说明 |
 | --- | --- | --- |
-| `Tenant ID` | 自定义 | 例如 `acme-wechat`，会出现在 webhook URL 中。 |
-| `Host Client ID` | 自定义 | SaaS 后端调用本服务 API 使用。 |
-| `Host Client Secret` | 自定义 | 只能保存在 SaaS 后端，不要暴露给浏览器。 |
+| `接入标识` | 自定义 | 原 `Tenant ID`。给这条接入起一个稳定名字，例如 `acme-prod`，会出现在 webhook URL 中。 |
+| `SaaS API Key` | 自定义 | 原 `Host Client ID`。SaaS 后端调用本服务 API 时使用。 |
+| `SaaS API Secret` | 自定义 | 原 `Host Client Secret`。只能保存在 SaaS 后端，不要暴露给浏览器。 |
 | `微信 Token` | 微信消息推送配置 | 必须和微信开发者平台里填的一致。 |
 | `微信 AppID` | 公众号详情页 | 复制 AppID。 |
 | `微信 AppSecret` | 开发密钥区域 | 复制或重置 AppSecret。 |
-| `账号校验 URL` | SaaS 后端 | 可选。收到公众号消息后，本服务先问 SaaS 是否允许绑定该账号。 |
-| `结果通知 URL` | SaaS 后端 | 可选。绑定成功或失败后，本服务主动通知 SaaS。 |
+| `绑定前确认接口` | SaaS 后端 | 推荐。收到公众号消息后，本服务先问 SaaS 是否允许绑定该账号。 |
+| `绑定结果接收接口` | SaaS 后端 | 推荐。绑定成功或失败后，本服务主动通知 SaaS。 |
 | `回调签名密钥` | 自定义 | 可选。用于 SaaS 校验本服务发出的回调签名。 |
 
 保存后，控制台会长期写入 `WVB_CONFIG_PATH` 指向的 JSON 文件。
@@ -136,9 +136,9 @@ curl -sS -X POST http://127.0.0.1:3000/v1/tenants/acme-wechat/pending-bind-inten
 请关注我们的公众号，并向公众号发送你的平台账号：user_123
 ```
 
-如果配置了 `账号校验 URL`，本服务会先调用 SaaS 后端确认该账号是否有效。返回 `{"allowed": true}` 后才会写入绑定。
+如果配置了「绑定前确认接口」，本服务会先调用 SaaS 后端确认该账号是否有效。返回 `{"allowed": true}` 后才会写入绑定。
 
-绑定成功后，SaaS 后端可以等待 `结果通知 URL` 的主动通知，也可以继续查询：
+绑定成功后，SaaS 后端可以等待「绑定结果接收接口」的主动通知，也可以继续查询：
 
 ```bash
 curl -sS http://127.0.0.1:3000/v1/tenants/acme-wechat/bindings/user_123 \
@@ -180,7 +180,7 @@ curl -sS http://127.0.0.1:3000/v1/tenants/acme-wechat/bindings/user_123 \
 优先检查：
 
 - 消息推送 URL 是否是公网 HTTPS。
-- URL 中的 `{tenantId}` 是否和本项目控制台一致。
+- URL 中的 `{tenantId}` 是否和本项目控制台「接入标识」一致。
 - Token 是否完全一致。
 - 消息推送是否已启用。
 - 数据格式是否是 XML。

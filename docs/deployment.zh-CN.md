@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP 监听端口 |
 | `HOST` | `127.0.0.1` | HTTP 监听地址；公网部署通常设为 `0.0.0.0` 并放在反向代理后 |
-| `WVB_CONFIG_PATH` | `./config/integrations.example.json` | 租户和公众号配置文件 |
+| `WVB_CONFIG_PATH` | `./config/integrations.example.json` | 接入和公众号配置文件 |
 | `WVB_DATA_PATH` | `./data/store.json` | JSON 数据文件路径 |
 | `WVB_ADMIN_TOKEN` | 空 | Web 控制台管理 API token；为空时只允许 localhost 管理访问 |
 
@@ -41,8 +41,8 @@ http://127.0.0.1:3000/console
 
 控制台能力：
 
-- 新增或更新租户配置，保存到 `WVB_CONFIG_PATH` 指向的 JSON 文件。
-- 展示当前租户 Webhook URL，并引导站长打开 `/console/wechat-setup.html` 图文教程。
+- 新增或更新接入配置，保存到 `WVB_CONFIG_PATH` 指向的 JSON 文件。
+- 展示当前接入 Webhook URL，并引导站长打开 `/console/wechat-setup.html` 图文教程。
 - 查询用户验证状态。
 - 查看最近验证尝试。
 

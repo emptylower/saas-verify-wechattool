@@ -272,11 +272,72 @@ code {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .span-2 {
   grid-column: 1 / -1;
+}
+
+.form-section {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.form-section:first-child {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.form-section strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.form-section span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.field-card {
+  gap: 8px;
+  border: 1px solid #ebe7dd;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 13px;
+}
+
+.field-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: #25322e;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.field-title small {
+  color: #8a928e;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.field-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.field-hint code {
+  background: #f3f0e8;
+  font-size: 11px;
 }
 
 .quiet-section {
@@ -604,6 +665,67 @@ code {
 
 .doc-table th {
   background: #f4f6f8;
+}
+
+pre {
+  margin: 0;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f6f4ec;
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  white-space: pre;
+}
+
+.code-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.code-tabs button {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.code-tabs button:hover {
+  color: var(--accent);
+  box-shadow: none;
+  transform: none;
+}
+
+.code-tabs button[aria-selected="true"] {
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--accent);
+}
+
+.code-pane[hidden] {
+  display: none;
+}
+
+.code-pane {
+  display: grid;
+  gap: 16px;
 }
 
 @media (max-width: 980px) {
